@@ -21,7 +21,7 @@ done
 run tests/db/01_seed.sql
 
 fallas=0
-for t in tests/db/1*.sql tests/db/2*.sql; do
+for t in tests/db/[1-9]*.sql; do
   [ -e "$t" ] || continue
   echo "prueba: $(basename "$t")"
   if ! out=$(psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$t" 2>&1); then
