@@ -100,6 +100,8 @@ create table public.semanas (
   inicio      date not null check (extract(isodow from inicio) = 4),
   fin         date not null,
   estado      text not null default 'abierta' check (estado in ('abierta', 'cerrada', 'pagada')),
+  -- Reabierta por el admin: el cierre automático la respeta hasta que el admin la vuelva a cerrar.
+  reabierta   boolean not null default false,
   cerrada_en  timestamptz,
   pagada_en   timestamptz,
   unique (empresa_id, inicio),

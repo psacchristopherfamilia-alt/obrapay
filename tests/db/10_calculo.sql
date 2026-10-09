@@ -1,3 +1,4 @@
+begin;
 -- Pruebas del cálculo de nómina (reglas 1 a 6 del plan).
 
 -- ---------------------------------------------------------------------------
@@ -98,3 +99,4 @@ select test.igual((select minutos_extra from public._calcular_semana(test.semana
 
 drop table r;
 drop table rc;
+rollback;

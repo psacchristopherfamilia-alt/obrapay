@@ -120,7 +120,8 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Turnos que entran a una semana, ya partidos y con almuerzo descontado
 --   Semana abierta : turnos aprobados sin semana asignada con fecha <= fin
---                    (lo aprobado tarde de semanas anteriores pasa a esta).
+--                    (lo aprobado tarde de semanas anteriores pasa a esta);
+--                    si hay dos semanas abiertas, cada turno va solo a la más antigua.
 --   Semana cerrada : turnos que quedaron asignados a ella al cerrar.
 -- Uso interno: no se expone a los usuarios.
 -- ---------------------------------------------------------------------------
@@ -148,7 +149,12 @@ language sql stable security definer set search_path = public as $$
     where t.estado in ('aprobado', 'aprobado_admin')
       and t.salida is not null
       and (
-        (sem.estado = 'abierta' and t.semana_id is null and (t.entrada at time zone sem.tz)::date <= sem.fin)
+        -- Abierta: el turno pertenece a la semana abierta más antigua que lo cubre.
+        (sem.estado = 'abierta' and t.semana_id is null
+         and sem.id = (select s2.id from semanas s2
+                       where s2.empresa_id = sem.empresa_id and s2.estado = 'abierta'
+                         and s2.fin >= (t.entrada at time zone sem.tz)::date
+                       order by s2.inicio limit 1))
         or (sem.estado <> 'abierta' and t.semana_id = sem.id)
       )
   ),
