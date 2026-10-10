@@ -11,7 +11,7 @@ el admin revisa → se paga el viernes. El dueño ve todo en solo lectura.
 | Base de datos (esquema, cálculo, operaciones, permisos) | Instalada en Supabase y probada (124 pruebas) |
 | Edge Function `crear-trabajador` | Desplegada en Supabase |
 | Tareas programadas (pg_cron) | Activas: cada 5 minutos |
-| App Next.js (pantallas) | Siguiente paso |
+| App web (pantallas) | Hecha: HTML + CSS + JS sin dependencias, en `web/` |
 
 ## Estructura
 
@@ -24,8 +24,17 @@ supabase/
     ..._rls.sql           permisos por rol
     ..._cron.sql          cierres automáticos cada 5 minutos (solo Supabase)
   functions/crear-trabajador/   alta de trabajadores sin correo y restablecer contraseña
+web/                      la app (se publica tal cual como sitio estático)
+  config.js               URL de Supabase y clave publicable
+  js/app.js               arranque, sesión, menú por rol
+  js/vistas/              trabajador, supervisor, admin, dueño, acceso
+  js/i18n.js              textos en español, inglés y kreyòl
+  js/xlsx.js              genera Excel sin librerías
 tests/db/                 pruebas SQL (cálculo, operaciones, permisos)
+tests/web/                recorrido en navegador con Supabase simulado + revisión de traducciones
 scripts/test-db.sh        corre migraciones + pruebas en un Postgres local
+scripts/pg-local.sh       arranca un Postgres local para las pruebas
+respaldo/                 esquema y catálogos del prototipo anterior
 ```
 
 ## Reglas de nómina
@@ -45,6 +54,17 @@ Requiere PostgreSQL 15+ local.
 ```bash
 PGHOST=/tmp PGUSER=postgres ./scripts/test-db.sh
 ```
+
+Pantallas (requiere Chromium + Playwright):
+
+```bash
+node tests/web/claves.mjs
+node tests/web/simulado.mjs
+```
+
+## Publicar la app
+
+Sitio estático: carpeta `web/`, sin paso de compilación.
 
 ## Desplegar la base de datos
 
