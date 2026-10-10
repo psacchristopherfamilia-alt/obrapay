@@ -1,0 +1,14 @@
+{
+  "nota": "Datos de catálogo del prototipo anterior (proyecto Supabase 'obrapay'), tomados el 2026-10-10. 0 usuarios. Tareas programadas que tenía: cierre-semanal-obrapay, cierre-diario-turnos-obrapay, vencer-trials-obrapay, avisar-trial-vencer-obrapay, avisar-mantenimiento-vehiculos, marcar-facturas-vencidas, avisar-certificaciones-vencer, avisar-permiso-trabajo-vencer. Bucket de archivos: documentos-proyecto (se conserva).",
+  "addons_catalogo": [
+    {"clave": "whatsapp", "nombre": "Recibos de pago por WhatsApp", "precio_mensual": 10, "activo": true},
+    {"clave": "storage", "nombre": "Almacenamiento extendido", "precio_mensual": 8, "activo": true}
+  ],
+  "catalogo_oficios": ["Operador de maquinaria", "Albañil", "Electricista", "Plomero", "Ayudante general", "Carpintero", "Soldador", "Pintor"],
+  "planes": [
+    {"clave": "free", "nombre": "Gratuito", "precio_mensual": 0, "limite_trabajadores": 20, "limite_proyectos": 5, "historial_semanas": 8},
+    {"clave": "basic", "nombre": "Básico", "precio_mensual": 29},
+    {"clave": "pro", "nombre": "Profesional", "precio_mensual": 79},
+    {"clave": "enterprise", "nombre": "Empresarial", "precio_mensual": 199}
+  ]
+}
