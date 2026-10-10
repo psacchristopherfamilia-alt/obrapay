@@ -551,7 +551,8 @@ revoke execute on function public.prestamo_saldo(uuid) from authenticated;
 -- Lo que la app puede llamar (cada función revisa el rol por dentro)
 grant execute on function
   public.mi_empresa(), public.tengo_rol(text), public.supervisa_proyecto(uuid), public.supervisa_a(uuid),
-  public.semana_inicio_de(date), public.minutos_turno(timestamptz, timestamptz, text, time),
+  public.semana_inicio_de(date), public.minutos_turno(timestamptz, timestamptz, text, time, time, time),
+  public._cruce_min(timestamp, timestamp, timestamp, timestamp),
   public.distancia_m(double precision, double precision, double precision, double precision),
   public.semana_actual(), public.marcar_entrada(uuid, double precision, double precision),
   public.marcar_salida(double precision, double precision), public.aprobar_turnos(uuid[]),

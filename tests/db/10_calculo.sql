@@ -15,7 +15,7 @@ select test.igual((select min_reg + min_extra from public.minutos_turno('2026-10
 -- ---------------------------------------------------------------------------
 -- Caso base del prototipo (sin almuerzo): Juan, 46 h × $18 − 3% − $50 = $753.16
 -- ---------------------------------------------------------------------------
-update public.empresas set almuerzo_min = 0;
+update public.empresas set almuerzo_inicio = null, almuerzo_fin = null;
 
 select test.turno('c1', 'f1', '2026-10-01', '09:00', '19:00');  -- jue: 8 + 2 extra
 select test.turno('c1', 'f1', '2026-10-02', '07:00', '11:00');  -- vie: 4
@@ -73,30 +73,41 @@ select test.igual((select bruto from public._calcular_semana(test.semana('2026-1
                    where perfil_id = '00000000-0000-0000-0000-0000000000c4'), 128.00, 'Jean: solo cuenta el turno aprobado (8 h × $16)');
 
 -- ---------------------------------------------------------------------------
--- Regla 2: almuerzo fijo (30 min si el día suma 6 h o más)
+-- Regla 2: almuerzo fijo de 12:00 a 1:00 p.m. (no se paga lo marcado en ese horario)
 -- ---------------------------------------------------------------------------
-update public.empresas set almuerzo_min = 30, almuerzo_desde_min = 360;
+update public.empresas set almuerzo_inicio = '12:00', almuerzo_fin = '13:00';
 
-select test.turno('c3', 'f1', '2026-10-01', '07:00', '15:30');  -- 8.5 h → 8 h
-select test.turno('c3', 'f1', '2026-10-02', '07:00', '12:00');  -- 5 h, no llega a 6 → sin almuerzo
-select test.turno('c3', 'f1', '2026-10-03', '07:00', '07:20');  -- dos turnos el mismo día (6 h 50 m):
-select test.turno('c3', 'f1', '2026-10-03', '07:30', '14:00');  -- el almuerzo sale 20 min del 1º y 10 del 2º
+select test.igual((select min_reg from public.minutos_turno('2026-10-01 07:00-04', '2026-10-01 15:30-04', 'America/Grand_Turk', '17:00', '12:00', '13:00')), 450, '7:00–3:30 p.m. con almuerzo = 7.5 h');
+select test.igual((select min_reg from public.minutos_turno('2026-10-01 07:00-04', '2026-10-01 12:00-04', 'America/Grand_Turk', '17:00', '12:00', '13:00')), 300, 'sale a las 12: no se descuenta almuerzo');
+select test.igual((select min_reg from public.minutos_turno('2026-10-01 07:00-04', '2026-10-01 12:30-04', 'America/Grand_Turk', '17:00', '12:00', '13:00')), 300, 'sale a las 12:30: la media hora de almuerzo no se paga');
+select test.igual((select min_reg from public.minutos_turno('2026-10-01 13:00-04', '2026-10-01 16:00-04', 'America/Grand_Turk', '17:00', '12:00', '13:00')), 180, 'entra a la 1: nada que descontar');
+
+select test.turno('c3', 'f1', '2026-10-01', '07:00', '15:30');  -- 7.5 h
+select test.turno('c3', 'f1', '2026-10-02', '07:00', '12:00');  -- 5 h
+select test.turno('c3', 'f1', '2026-10-03', '07:00', '12:30');  -- 5 h
+select test.turno('c3', 'f2', '2026-10-03', '13:00', '16:00');  -- 3 h
 
 create temp table rc as
   select * from public._calcular_semana(test.semana('2026-10-01'))
   where perfil_id = '00000000-0000-0000-0000-0000000000c3';
-select test.igual((select minutos_reg from rc), 1160, 'Carlos: 480 + 300 + 380 min tras almuerzo');
-select test.igual((select bruto from rc), 251.33, 'Carlos: 19 h 20 m × $13 = $251.33');
-select test.igual((select seguro from rc), 7.54, 'Carlos: seguro redondeado a $7.54');
-select test.igual((select neto from rc), 243.79, 'Carlos: neto $243.79');
-select test.ok((select min(min_reg) from public._turnos_semana(test.semana('2026-10-01'))
-                where perfil_id = '00000000-0000-0000-0000-0000000000c3' and fecha = '2026-10-03') = 0,
-               'Carlos: el primer turno corto absorbe sus 20 min de almuerzo');
+select test.igual((select minutos_reg from rc), 1230, 'Carlos: 20.5 h tras almuerzo');
+select test.igual((select bruto from rc), 266.50, 'Carlos: 20.5 h × $13 = $266.50');
+select test.igual((select seguro from rc), 8.00, 'Carlos: seguro 3% redondeado a $8.00');
+select test.igual((select neto from rc), 258.50, 'Carlos: neto $258.50');
 
-select test.turno('c5', 'f1', '2026-10-01', '17:00', '23:00');   -- todo extra: el almuerzo sale del extra
-select test.igual((select minutos_extra from public._calcular_semana(test.semana('2026-10-01'))
-                   where perfil_id = '00000000-0000-0000-0000-0000000000c5'), 330, 'Pedro: 6 h extra − 30 min almuerzo');
+-- Pedro marca salida a las 12 y entrada a la 1: no se descuenta dos veces.
+-- Otro día trabaja 11:30–6:00 p.m.: 4.5 h regulares (sin la hora de almuerzo) + 1 h extra.
+select test.turno('c5', 'f1', '2026-10-01', '07:00', '12:00');
+select test.turno('c5', 'f1', '2026-10-01', '13:00', '16:00');
+select test.turno('c5', 'f3', '2026-10-02', '11:30', '18:00');
+create temp table rp as
+  select * from public._calcular_semana(test.semana('2026-10-01'))
+  where perfil_id = '00000000-0000-0000-0000-0000000000c5';
+select test.igual((select minutos_reg from rp), 750, 'Pedro: 8 h + 4.5 h regulares');
+select test.igual((select minutos_extra from rp), 60, 'Pedro: 1 h extra');
+select test.igual((select bruto from rp), 229.50, 'Pedro: 13.5 h × $17 = $229.50');
 
+drop table rp;
 drop table r;
 drop table rc;
 rollback;

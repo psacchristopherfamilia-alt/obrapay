@@ -8,7 +8,7 @@ el admin revisa → se paga el viernes. El dueño ve todo en solo lectura.
 
 | Parte | Estado |
 | --- | --- |
-| Base de datos (esquema, cálculo, operaciones, permisos) | Hecha y probada (117 pruebas) |
+| Base de datos (esquema, cálculo, operaciones, permisos) | Hecha y probada (122 pruebas) |
 | Edge Function `crear-trabajador` | Escrita; se prueba al desplegar en Supabase |
 | Tareas programadas (pg_cron) | Escritas; se activan en Supabase |
 | App Next.js (pantallas) | Siguiente paso |
@@ -31,7 +31,7 @@ scripts/test-db.sh        corre migraciones + pruebas en un Postgres local
 ## Reglas de nómina
 
 1. Regular = minutos antes de las 5:00 p.m. (hora local); extra = después. Misma tarifa.
-2. Almuerzo fijo, una vez por día, si el día suma 6 h o más (configurable: `empresas.almuerzo_min`, `almuerzo_desde_min`).
+2. Almuerzo fijo de 12:00 a 1:00 p.m.: el tiempo marcado en ese horario no se paga (configurable: `empresas.almuerzo_inicio`, `almuerzo_fin`).
 3. Tarifa = la vigente en la fecha del turno; un aumento a mitad de semana aplica desde ese día.
 4. Bruto se redondea a centavos al final de la semana. Seguro = % × bruto, redondeado.
 5. Préstamo: lo fija el admin cada semana; nunca más que el saldo ni más que el pago.

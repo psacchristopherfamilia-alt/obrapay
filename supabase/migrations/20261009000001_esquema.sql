@@ -15,10 +15,14 @@ create table public.empresas (
   gps_modo            text not null default 'marcar' check (gps_modo in ('bloquear', 'marcar')),
   hora_extra_desde    time not null default '17:00',
   hora_cierre_turno   time not null default '23:00',
-  -- Almuerzo fijo: se descuenta una vez por día trabajado, de las horas regulares.
-  almuerzo_min        integer not null default 30 check (almuerzo_min between 0 and 240),
-  almuerzo_desde_min  integer not null default 360 check (almuerzo_desde_min >= 0),
-  creado_en           timestamptz not null default now()
+  -- Almuerzo fijo de 12:00 a 1:00 p.m.: el tiempo marcado dentro de ese horario no se paga.
+  -- Si el trabajador marca salida a las 12 y entrada a la 1, no se descuenta dos veces.
+  -- Ambos en null = sin almuerzo.
+  almuerzo_inicio     time default '12:00',
+  almuerzo_fin        time default '13:00',
+  creado_en           timestamptz not null default now(),
+  check ((almuerzo_inicio is null and almuerzo_fin is null)
+         or (almuerzo_inicio is not null and almuerzo_fin is not null and almuerzo_fin > almuerzo_inicio))
 );
 
 -- ---------------------------------------------------------------------------

@@ -1,8 +1,7 @@
 -- ObraPay · Funciones auxiliares y cálculo de nómina
 -- Reglas (ver plan técnico):
 --   1. Regular = minutos antes de hora_extra_desde (5 p.m.) en hora local; extra = el resto. Misma tarifa.
---   2. Almuerzo fijo: una vez por día, si el día suma >= almuerzo_desde_min; sale de las horas regulares
---      empezando por el primer turno del día (si no alcanza, del extra).
+--   2. Almuerzo fijo de 12:00 a 1:00 p.m.: los minutos marcados dentro de ese horario no se pagan.
 --   3. Tarifa = la vigente en la fecha local de entrada del turno.
 --   4. Bruto se redondea a centavos al final de la semana, no por turno.
 --   5. Seguro = % vigente al último día de la semana × bruto, redondeado a centavos.
@@ -70,10 +69,17 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Regla 1: partir un turno en minutos regulares y extra
+-- Reglas 1 y 2: partir un turno en minutos regulares y extra, sin el almuerzo
 -- ---------------------------------------------------------------------------
+-- Minutos en que [e, s) se cruza con [a, b).
+create or replace function public._cruce_min(e timestamp, s timestamp, a timestamp, b timestamp) returns numeric
+language sql immutable as $$
+  select greatest(0, extract(epoch from (least(s, b) - greatest(e, a))) / 60)
+$$;
+
 create or replace function public.minutos_turno(
-  p_entrada timestamptz, p_salida timestamptz, p_tz text, p_hora_extra time
+  p_entrada timestamptz, p_salida timestamptz, p_tz text, p_hora_extra time,
+  p_alm_ini time default null, p_alm_fin time default null
 ) returns table (min_reg integer, min_extra integer)
 language sql stable as $$
   with t as (
@@ -81,15 +87,19 @@ language sql stable as $$
            date_trunc('minute', p_salida  at time zone p_tz) as s
   ),
   r as (
-    select coalesce(sum(greatest(0,
-             extract(epoch from (least(t.s, g.d + p_hora_extra) - greatest(t.e, g.d))) / 60
-           )), 0)::integer as reg,
-           (extract(epoch from (t.s - t.e)) / 60)::integer as total
+    select
+      (extract(epoch from (t.s - t.e)) / 60)::integer as total,
+      coalesce(sum(public._cruce_min(t.e, t.s, g.d, g.d + p_hora_extra)), 0)::integer as reg_bruto,
+      -- almuerzo que cae en horario regular y en horario extra
+      coalesce(sum(case when p_alm_ini is null then 0 else
+        public._cruce_min(t.e, t.s, g.d + p_alm_ini, g.d + least(p_alm_fin, p_hora_extra)) end), 0)::integer as alm_reg,
+      coalesce(sum(case when p_alm_ini is null then 0 else
+        public._cruce_min(t.e, t.s, g.d + greatest(p_alm_ini, p_hora_extra), g.d + p_alm_fin) end), 0)::integer as alm_extra
     from t
     cross join lateral generate_series(date_trunc('day', t.e), date_trunc('day', t.s), interval '1 day') as g(d)
     group by t.s, t.e
   )
-  select r.reg, r.total - r.reg from r
+  select r.reg_bruto - r.alm_reg, (r.total - r.reg_bruto) - r.alm_extra from r
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -133,19 +143,18 @@ returns table (
 language sql stable security definer set search_path = public as $$
   with sem as (
     select s.*, e.zona_horaria as tz, e.hora_extra_desde as hx,
-           e.almuerzo_min as alm, e.almuerzo_desde_min as alm_desde
+           e.almuerzo_inicio as alm_ini, e.almuerzo_fin as alm_fin
     from semanas s join empresas e on e.id = s.empresa_id
     where s.id = p_semana
   ),
   base as (
-    select t.id, t.perfil_id, t.proyecto_id, t.entrada,
+    select t.id, t.perfil_id, t.proyecto_id,
            (t.entrada at time zone sem.tz)::date as fecha,
            m.min_reg, m.min_extra,
-           t.estado = 'aprobado_admin' as aprobado_admin,
-           sem.alm, sem.alm_desde
+           t.estado = 'aprobado_admin' as aprobado_admin
     from sem
     join turnos t on t.empresa_id = sem.empresa_id
-    cross join lateral public.minutos_turno(t.entrada, t.salida, sem.tz, sem.hx) m
+    cross join lateral public.minutos_turno(t.entrada, t.salida, sem.tz, sem.hx, sem.alm_ini, sem.alm_fin) m
     where t.estado in ('aprobado', 'aprobado_admin')
       and t.salida is not null
       and (
@@ -157,30 +166,10 @@ language sql stable security definer set search_path = public as $$
                        order by s2.inicio limit 1))
         or (sem.estado <> 'abierta' and t.semana_id = sem.id)
       )
-  ),
-  dia as (
-    select b.*,
-           sum(b.min_reg)   over w_dia as reg_dia,
-           sum(b.min_extra) over w_dia as extra_dia,
-           coalesce(sum(b.min_reg)   over w_antes, 0) as reg_antes,
-           coalesce(sum(b.min_extra) over w_antes, 0) as extra_antes
-    from base b
-    window w_dia   as (partition by b.perfil_id, b.fecha),
-           w_antes as (partition by b.perfil_id, b.fecha order by b.entrada, b.id
-                       rows between unbounded preceding and 1 preceding)
-  ),
-  alm as (
-    select d.*,
-           case when d.reg_dia + d.extra_dia >= d.alm_desde then d.alm else 0 end as alm_dia
-    from dia d
   )
-  select a.id, a.perfil_id, a.proyecto_id, a.fecha,
-         (a.min_reg - least(a.min_reg, greatest(0, a.alm_dia - a.reg_antes)))::integer,
-         (a.min_extra - least(a.min_extra,
-             greatest(0, greatest(0, a.alm_dia - a.reg_dia) - a.extra_antes)))::integer,
-         public.tarifa_vigente(a.perfil_id, a.fecha),
-         a.aprobado_admin
-  from alm a
+  select b.id, b.perfil_id, b.proyecto_id, b.fecha, b.min_reg, b.min_extra,
+         public.tarifa_vigente(b.perfil_id, b.fecha), b.aprobado_admin
+  from base b
 $$;
 
 -- Detalle por trabajador y proyecto (bruto sin redondear todavía).

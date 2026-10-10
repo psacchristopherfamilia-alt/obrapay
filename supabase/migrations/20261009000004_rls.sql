@@ -27,7 +27,7 @@ alter table public.eventos_admin         enable row level security;
 revoke all on all tables in schema public from anon, authenticated;
 grant select on all tables in schema public to authenticated;
 
-grant update (zona_horaria, gps_activo, gps_modo, hora_extra_desde, hora_cierre_turno, almuerzo_min, almuerzo_desde_min, nombre)
+grant update (zona_horaria, gps_activo, gps_modo, hora_extra_desde, hora_cierre_turno, almuerzo_inicio, almuerzo_fin, nombre)
   on public.empresas to authenticated;
 grant update (nombre, oficio, roles, activo, usuario) on public.perfiles to authenticated;
 grant insert, update, delete on public.proyectos, public.proyecto_supervisores, public.proyecto_trabajadores to authenticated;

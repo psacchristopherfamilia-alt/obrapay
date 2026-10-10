@@ -118,39 +118,39 @@ insert into ids values ('prest_carlos', public.crear_prestamo(pg_temp.yo('c3'), 
 select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 40)$$, 'máximo $0.00', 'sin horas aprobadas no se puede descontar');
 
 reset role;
-select test.turno('c3', 'f1', '2026-10-08', '07:00', '15:30');   -- 8 h tras almuerzo × $13 = $104.00; seguro $3.12
+select test.turno('c3', 'f1', '2026-10-08', '07:00', '15:30');   -- 7.5 h tras almuerzo × $13 = $97.50; seguro $2.93
 set role authenticated;
 select test.como(pg_temp.yo('a1'));
 select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 350)$$, 'supera el saldo del préstamo ($300.00)', 'no descuenta más que el saldo');
-select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 101)$$, 'máximo $100.88', 'no deja el pago en negativo');
+select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 101)$$, 'máximo $94.57', 'no deja el pago en negativo');
 select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 40);
-select test.igual((select neto from public.nomina_semana(test.semana('2026-10-08')) where perfil_id = pg_temp.yo('c3')), 60.88, 'Carlos: $104.00 − $3.12 − $40.00 = $60.88');
+select test.igual((select neto from public.nomina_semana(test.semana('2026-10-08')) where perfil_id = pg_temp.yo('c3')), 54.57, 'Carlos: $97.50 − $2.93 − $40.00 = $54.57');
 
 -- ===========================================================================
 -- F. Cierre semanal, arrastre de lo aprobado tarde, reabrir y pagar
 -- ===========================================================================
 reset role;
 insert into ids values
-  ('juan_mie7',  test.turno('c1', 'f1', '2026-10-07', '07:00', '15:00')),                 -- 7.5 h × $18 = $135.00
+  ('juan_mie7',  test.turno('c1', 'f1', '2026-10-07', '07:00', '15:00')),                 -- 7 h × $18 = $126.00
   ('marie_mie7', test.turno('c2', 'f2', '2026-10-07', '08:00', '16:00', 'por_aprobar'));  -- sin aprobar al cierre
 
 select test.igual(public.cerrar_semanas_vencidas('2026-10-07 23:58-04'), 0, 'miércoles 11:58 p.m.: todavía no cierra');
 select test.igual(public.cerrar_semanas_vencidas('2026-10-08 00:01-04'), 1, 'pasado el miércoles 11:59 p.m. cierra la semana');
 select test.igual((select estado from public.semanas where id = test.semana('2026-10-01')), 'cerrada', 'semana del 1 oct cerrada');
-select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c1')), 135.00, 'nómina congelada de Juan: $135.00');
+select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c1')), 126.00, 'nómina congelada de Juan: $126.00 (7 h, sin la hora de almuerzo)');
 select test.igual((select semana_id from public.turnos where id = (select id from ids where nombre = 'juan_mie7')), test.semana('2026-10-01'), 'el turno queda ligado a la semana cerrada');
 select test.ok((select semana_id is null from public.turnos where id = (select id from ids where nombre = 'marie_mie7')), 'lo no aprobado queda fuera');
 select test.igual((select estado from public.semanas where inicio = '2026-10-08'), 'abierta', 'la semana siguiente queda abierta');
 
 update public.tarifas set monto_hora = 50 where perfil_id = pg_temp.yo('c1') and vigente_desde = '2026-10-01';
-select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c1')), 135.00, 'cambiar una tarifa después no altera lo cerrado');
+select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c1')), 126.00, 'cambiar una tarifa después no altera lo cerrado');
 update public.tarifas set monto_hora = 18 where perfil_id = pg_temp.yo('c1') and vigente_desde = '2026-10-01';
 
 set role authenticated;
 select test.como(pg_temp.yo('b2'));
 select public.aprobar_turnos(array[(select id from ids where nombre = 'marie_mie7')]);
 reset role;
-select test.igual((select min_reg from public._turnos_semana(test.semana('2026-10-08')) where turno_id = (select id from ids where nombre = 'marie_mie7')), 450, 'aprobado tarde: pasa a la semana siguiente (7.5 h)');
+select test.igual((select min_reg from public._turnos_semana(test.semana('2026-10-08')) where turno_id = (select id from ids where nombre = 'marie_mie7')), 420, 'aprobado tarde: pasa a la semana siguiente (7 h)');
 set role authenticated;
 select test.como(pg_temp.yo('b1'));
 select test.falla($$select public.corregir_turno((select id from ids where nombre = 'juan_mie7'), '2026-10-07 07:00-04', '2026-10-07 16:00-04', 'x')$$, 'semana ya está cerrada', 'no se corrige un turno de una semana cerrada');
@@ -176,7 +176,7 @@ select test.igual((select count(*)::int from public._turnos_semana(test.semana('
 set role authenticated;
 select test.como(pg_temp.yo('a1'));
 select public.cerrar_semana(test.semana('2026-10-01'));
-select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c2')), 150.00, 'al volver a cerrar entra lo de Marie (7.5 h × $20)');
+select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c2')), 140.00, 'al volver a cerrar entra lo de Marie (7 h × $20)');
 select public.marcar_semana_pagada(test.semana('2026-10-01'));
 select test.falla($$select public.reabrir_semana(test.semana('2026-10-01'), 'x')$$, 'pagada no se puede reabrir', 'una semana pagada no se reabre');
 
