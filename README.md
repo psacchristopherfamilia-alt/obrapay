@@ -8,9 +8,9 @@ el admin revisa → se paga el viernes. El dueño ve todo en solo lectura.
 
 | Parte | Estado |
 | --- | --- |
-| Base de datos (esquema, cálculo, operaciones, permisos) | Hecha y probada (122 pruebas) |
-| Edge Function `crear-trabajador` | Escrita; se prueba al desplegar en Supabase |
-| Tareas programadas (pg_cron) | Escritas; se activan en Supabase |
+| Base de datos (esquema, cálculo, operaciones, permisos) | Instalada en Supabase y probada (124 pruebas) |
+| Edge Function `crear-trabajador` | Desplegada en Supabase |
+| Tareas programadas (pg_cron) | Activas: cada 5 minutos |
 | App Next.js (pantallas) | Siguiente paso |
 
 ## Estructura

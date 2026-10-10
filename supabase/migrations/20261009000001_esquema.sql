@@ -2,7 +2,7 @@
 -- Todas las tablas llevan empresa_id para poder volverse multiempresa sin rehacer nada.
 -- Las horas se guardan en UTC (timestamptz); la zona horaria vive en la empresa.
 
-create extension if not exists pgcrypto;
+create extension if not exists pgcrypto with schema extensions;
 
 -- ---------------------------------------------------------------------------
 -- Empresa y reglas configurables
@@ -200,6 +200,8 @@ create table public.nomina_semanal (
   prestamo             numeric(10, 2) not null,
   neto                 numeric(10, 2) not null,
   con_aprobacion_admin boolean not null,
+  -- Al reabrir la semana se marca anulada (nunca se borra); al volver a cerrar se reemplaza.
+  anulada              boolean not null default false,
   primary key (semana_id, perfil_id)
 );
 
@@ -211,6 +213,7 @@ create table public.nomina_proyecto (
   minutos_reg    integer not null,
   minutos_extra  integer not null,
   bruto          numeric(10, 2) not null,
+  anulada        boolean not null default false,
   primary key (semana_id, perfil_id, proyecto_id)
 );
 

@@ -170,6 +170,7 @@ select test.falla($$select * from public.reporte_mensual(2026, 10)$$, 'No tienes
 -- Reabrir: el cierre automático la respeta y nada se cuenta dos veces
 select test.como(pg_temp.yo('a1'));
 select public.reabrir_semana(test.semana('2026-10-01'), 'Revisar horas de Juan');
+select test.ok((select bool_and(anulada) from public.nomina_semanal where semana_id = test.semana('2026-10-01')), 'al reabrir, la nómina congelada queda anulada (no se borra)');
 reset role;
 select test.igual(public.cerrar_semanas_vencidas('2026-10-08 00:10-04'), 0, 'semana reabierta: el cierre automático no la vuelve a cerrar');
 select test.igual((select count(*)::int from public._turnos_semana(test.semana('2026-10-08')) where fecha < '2026-10-08'), 0, 'con dos semanas abiertas, lo del 7 oct va solo a la del 1 oct');
@@ -177,6 +178,7 @@ set role authenticated;
 select test.como(pg_temp.yo('a1'));
 select public.cerrar_semana(test.semana('2026-10-01'));
 select test.igual((select bruto from public.nomina_semanal where semana_id = test.semana('2026-10-01') and perfil_id = pg_temp.yo('c2')), 140.00, 'al volver a cerrar entra lo de Marie (7 h × $20)');
+select test.ok((select not bool_or(anulada) from public.nomina_semanal where semana_id = test.semana('2026-10-01')), 'al volver a cerrar, la nómina vuelve a estar vigente');
 select public.marcar_semana_pagada(test.semana('2026-10-01'));
 select test.falla($$select public.reabrir_semana(test.semana('2026-10-01'), 'x')$$, 'pagada no se puede reabrir', 'una semana pagada no se reabre');
 

@@ -43,7 +43,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Jueves en que empieza la semana de pago que contiene p_fecha.
 create or replace function public.semana_inicio_de(p_fecha date) returns date
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select p_fecha - ((extract(isodow from p_fecha)::int - 4 + 7) % 7)
 $$;
 
@@ -73,7 +73,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Minutos en que [e, s) se cruza con [a, b).
 create or replace function public._cruce_min(e timestamp, s timestamp, a timestamp, b timestamp) returns numeric
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select greatest(0, extract(epoch from (least(s, b) - greatest(e, a))) / 60)
 $$;
 
@@ -81,7 +81,7 @@ create or replace function public.minutos_turno(
   p_entrada timestamptz, p_salida timestamptz, p_tz text, p_hora_extra time,
   p_alm_ini time default null, p_alm_fin time default null
 ) returns table (min_reg integer, min_extra integer)
-language sql stable as $$
+language sql stable set search_path = public as $$
   with t as (
     select date_trunc('minute', p_entrada at time zone p_tz) as e,
            date_trunc('minute', p_salida  at time zone p_tz) as s

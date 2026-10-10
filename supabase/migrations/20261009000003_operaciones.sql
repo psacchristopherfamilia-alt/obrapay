@@ -7,7 +7,7 @@
 -- ---------------------------------------------------------------------------
 create or replace function public.distancia_m(
   p_lat1 double precision, p_lng1 double precision, p_lat2 double precision, p_lng2 double precision
-) returns double precision language sql immutable as $$
+) returns double precision language sql immutable set search_path = public as $$
   select 2 * 6371000 * asin(sqrt(
     power(sin(radians(p_lat2 - p_lat1) / 2), 2)
     + cos(radians(p_lat1)) * cos(radians(p_lat2)) * power(sin(radians(p_lng2 - p_lng1) / 2), 2)
@@ -304,6 +304,7 @@ declare
   c record;
   d record;
   v_falta numeric;
+  v_ids uuid[];
 begin
   select * into s from semanas where id = p_semana for update;
   if not found or s.estado <> 'abierta' then return; end if;
@@ -320,21 +321,27 @@ begin
       jsonb_build_object('semana', p_semana, 'perfil', c.perfil_id, 'ajuste', -c.neto));
   end loop;
 
-  create temp table _incluidos on commit drop as
-    select turno_id from public._turnos_semana(p_semana);
+  select array_agg(turno_id) into v_ids from public._turnos_semana(p_semana);
 
-  insert into nomina_proyecto (semana_id, empresa_id, perfil_id, proyecto_id, minutos_reg, minutos_extra, bruto)
-  select p_semana, s.empresa_id, perfil_id, proyecto_id, minutos_reg, minutos_extra, round(bruto_exacto, 2)
-  from public._detalle_semana(p_semana);
+  -- Si la semana se cerró antes y se reabrió, sus filas están anuladas: se reemplazan.
+  insert into nomina_proyecto (semana_id, empresa_id, perfil_id, proyecto_id, minutos_reg, minutos_extra, bruto, anulada)
+  select p_semana, s.empresa_id, perfil_id, proyecto_id, minutos_reg, minutos_extra, round(bruto_exacto, 2), false
+  from public._detalle_semana(p_semana)
+  on conflict (semana_id, perfil_id, proyecto_id) do update
+    set minutos_reg = excluded.minutos_reg, minutos_extra = excluded.minutos_extra,
+        bruto = excluded.bruto, anulada = false;
 
   insert into nomina_semanal (semana_id, empresa_id, perfil_id, minutos_reg, minutos_extra, bruto,
-                              seguro_pct, seguro, prestamo, neto, con_aprobacion_admin)
+                              seguro_pct, seguro, prestamo, neto, con_aprobacion_admin, anulada)
   select p_semana, s.empresa_id, perfil_id, minutos_reg, minutos_extra, bruto,
-         seguro_pct, seguro, prestamo, neto, con_aprobacion_admin
-  from public._calcular_semana(p_semana);
+         seguro_pct, seguro, prestamo, neto, con_aprobacion_admin, false
+  from public._calcular_semana(p_semana)
+  on conflict (semana_id, perfil_id) do update
+    set minutos_reg = excluded.minutos_reg, minutos_extra = excluded.minutos_extra, bruto = excluded.bruto,
+        seguro_pct = excluded.seguro_pct, seguro = excluded.seguro, prestamo = excluded.prestamo,
+        neto = excluded.neto, con_aprobacion_admin = excluded.con_aprobacion_admin, anulada = false;
 
-  update turnos set semana_id = p_semana where id in (select turno_id from _incluidos);
-  drop table _incluidos;
+  update turnos set semana_id = p_semana where id = any (coalesce(v_ids, '{}'));
 
   update semanas set estado = 'cerrada', cerrada_en = now(), reabierta = false where id = p_semana;
   perform public.asegurar_semana(s.empresa_id, s.fin + 1);
@@ -404,8 +411,9 @@ begin
   if s.estado = 'abierta' then raise exception 'La semana ya está abierta'; end if;
   if coalesce(length(trim(p_motivo)), 0) = 0 then raise exception 'Escribe el motivo para reabrir'; end if;
 
-  delete from nomina_semanal where semana_id = p_semana;
-  delete from nomina_proyecto where semana_id = p_semana;
+  -- La nómina congelada no se borra: queda anulada hasta que la semana se vuelva a cerrar.
+  update nomina_semanal set anulada = true where semana_id = p_semana;
+  update nomina_proyecto set anulada = true where semana_id = p_semana;
   update turnos set semana_id = null where semana_id = p_semana;
   update semanas set estado = 'abierta', reabierta = true, cerrada_en = null where id = p_semana;
   perform public._evento(s.empresa_id, 'semana_reabierta', jsonb_build_object('semana', p_semana, 'motivo', p_motivo));
@@ -454,7 +462,7 @@ begin
              public.tarifa_vigente(n.perfil_id, s.fin), n.bruto, n.seguro_pct, n.seguro, n.prestamo, n.neto,
              n.con_aprobacion_admin, s.estado
       from nomina_semanal n join perfiles p on p.id = n.perfil_id
-      where n.semana_id = p_semana and (v_todos or n.perfil_id = auth.uid())
+      where n.semana_id = p_semana and not n.anulada and (v_todos or n.perfil_id = auth.uid())
       order by p.nombre;
   end if;
 end $$;
@@ -479,7 +487,7 @@ begin
     return query
       select n.perfil_id, n.proyecto_id, pr.nombre, n.minutos_reg, n.minutos_extra, n.bruto
       from nomina_proyecto n join proyectos pr on pr.id = n.proyecto_id
-      where n.semana_id = p_semana and (v_todos or n.perfil_id = auth.uid())
+      where n.semana_id = p_semana and not n.anulada and (v_todos or n.perfil_id = auth.uid())
       order by pr.nombre;
   end if;
 end $$;
@@ -502,7 +510,7 @@ begin
     join semanas s on s.id = n.semana_id
     join perfiles p on p.id = n.perfil_id
     where s.empresa_id = public.mi_empresa()
-      and s.estado in ('cerrada', 'pagada')
+      and s.estado in ('cerrada', 'pagada') and not n.anulada
       and extract(year from s.fin + 2) = p_anio and extract(month from s.fin + 2) = p_mes
     group by n.perfil_id, p.nombre
     order by p.nombre;
@@ -521,7 +529,7 @@ begin
     join semanas s on s.id = n.semana_id
     join proyectos pr on pr.id = n.proyecto_id
     where s.empresa_id = public.mi_empresa()
-      and s.estado in ('cerrada', 'pagada')
+      and s.estado in ('cerrada', 'pagada') and not n.anulada
       and extract(year from s.fin + 2) = p_anio and extract(month from s.fin + 2) = p_mes
     group by n.proyecto_id, pr.nombre
     order by pr.nombre;

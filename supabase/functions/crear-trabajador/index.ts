@@ -7,7 +7,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const DOMINIO_INTERNO = "obrapay.local";
 const CORS = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_ORIGIN") ?? "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -83,12 +83,15 @@ Deno.serve(async (req) => {
     return responder(400, { error: "Usuario no válido: usa letras, números, punto o guion (3 a 40)" });
   }
   if (!cuerpo.nombre?.trim()) return responder(400, { error: "Falta el nombre" });
-  if (!(cuerpo.tarifa > 0)) return responder(400, { error: "La tarifa debe ser mayor que cero" });
-  if (!(cuerpo.seguro_pct >= 0 && cuerpo.seguro_pct <= 100)) return responder(400, { error: "Seguro entre 0 y 100 %" });
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(cuerpo.vigente_desde ?? "")) return responder(400, { error: "Fecha no válida" });
   const roles = cuerpo.roles?.length ? cuerpo.roles : ["trabajador"];
   if (!roles.every((r) => ["trabajador", "supervisor", "admin", "dueno"].includes(r))) {
     return responder(400, { error: "Rol no válido" });
+  }
+  // Tarifa y seguro solo para quien marca horas.
+  if (roles.includes("trabajador")) {
+    if (!(cuerpo.tarifa > 0)) return responder(400, { error: "La tarifa debe ser mayor que cero" });
+    if (!(cuerpo.seguro_pct >= 0 && cuerpo.seguro_pct <= 100)) return responder(400, { error: "Seguro entre 0 y 100 %" });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cuerpo.vigente_desde ?? "")) return responder(400, { error: "Fecha no válida" });
   }
 
   const clave = claveTemporal();
@@ -104,13 +107,10 @@ Deno.serve(async (req) => {
   }
 
   const id = creado.user.id;
-  const pasos = [
-    servicio.from("perfiles").insert({
-      id, empresa_id: admin.empresa_id, usuario, nombre: cuerpo.nombre.trim(),
-      oficio: cuerpo.oficio?.trim() || null, roles, idioma: cuerpo.idioma ?? "es",
-    }),
-  ];
-  const { error: errPerfil } = await pasos[0];
+  const { error: errPerfil } = await servicio.from("perfiles").insert({
+    id, empresa_id: admin.empresa_id, usuario, nombre: cuerpo.nombre.trim(),
+    oficio: cuerpo.oficio?.trim() || null, roles, idioma: cuerpo.idioma ?? "es",
+  });
   if (errPerfil) {
     await servicio.auth.admin.deleteUser(id); // no dejar usuarios a medias
     return responder(errPerfil.code === "23505" ? 409 : 500, {
