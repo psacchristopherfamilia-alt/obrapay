@@ -64,31 +64,33 @@ function marco(rutaActual) {
   if (escritorio) {
     return html`
       <div class="escritorio">
-        <nav class="lateral" aria-label="${t("comun.menu")}">
-          <div class="marca">ObraPay<span>${ctx.empresa.nombre}</span></div>
-          <div class="nav-lista">${enlaces}</div>
-          <div class="lateral-pie">
-            <div class="quien">${ctx.perfil.nombre}<span>${ctx.roles.map((r) => t(`rol.${r}`)).join(" · ")}</span></div>
-            ${selectorIdioma("idioma-app")}
-            <button type="button" class="btn btn-fantasma" id="salir">${crudo(ICONO.salir)} ${t("comun.salir")}</button>
-          </div>
-        </nav>
+        <div class="lateral">
+          <header class="lateral-cab">
+            <div class="marca">ObraPay<span>${ctx.empresa.nombre}</span></div>
+            <div class="lateral-pie">
+              <div class="quien">${ctx.perfil.nombre}<span>${ctx.roles.map((r) => t(`rol.${r}`)).join(" · ")}</span></div>
+              ${selectorIdioma("idioma-app")}
+              <button type="button" class="btn btn-fantasma btn-chico" id="salir">${crudo(ICONO.salir)} ${t("comun.salir")}</button>
+            </div>
+          </header>
+          <nav class="nav-lista" aria-label="${t("comun.menu")}">${enlaces}</nav>
+        </div>
         <main id="vista" class="contenido" tabindex="-1"></main>
       </div>`;
   }
   return html`
     <div class="movil">
       <header class="cabecera">
-        <div><div class="sobre">ObraPay</div><div class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })}</div></div>
+        <div><div class="marca-app">ObraPay</div><p class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })} · ${ctx.empresa.nombre}</p></div>
         <div class="cab-acciones">
           ${selectorIdioma("idioma-app")}
-          <button type="button" class="btn-icono claro" id="salir" aria-label="${t("comun.salir")}">${crudo(ICONO.salir)}</button>
+          <button type="button" class="btn-icono" id="salir" aria-label="${t("comun.salir")}">${crudo(ICONO.salir)}</button>
         </div>
       </header>
-      <main id="vista" class="contenido-movil" tabindex="-1"></main>
       ${rutas.length > 1 ? html`<nav class="tabs" aria-label="${t("comun.menu")}" style="grid-template-columns: repeat(${rutas.length}, minmax(0, 1fr))">
-        ${rutas.map(([r, clave]) => html`<a href="#/${r}" class="tab ${r === rutaActual ? "activo" : ""}" ${r === rutaActual ? html`aria-current="page"` : ""}><span class="tab-barra"></span>${t(clave)}</a>`)}
+        ${rutas.map(([r, clave]) => html`<a href="#/${r}" class="tab ${r === rutaActual ? "activo" : ""}" ${r === rutaActual ? html`aria-current="page"` : ""}>${t(clave)}</a>`)}
       </nav>` : ""}
+      <main id="vista" class="contenido-movil" tabindex="-1"></main>
     </div>`;
 }
 

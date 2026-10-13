@@ -27,6 +27,16 @@ function ubicacion() {
   });
 }
 
+// Colores de las tarjetas de proyecto (variables de app.css).
+const COLORES = ["--acento", "--arcilla-osc", "--verde", "--gris"];
+
+// Tiempo desde la entrada como H:MM:SS, como el reloj que corre en la tarjeta.
+function cronometro(entrada) {
+  const s = Math.max(0, Math.floor((Date.now() - new Date(entrada)) / 1000));
+  const d2 = (n) => String(n).padStart(2, "0");
+  return `${Math.floor(s / 3600)}:${d2(Math.floor((s % 3600) / 60))}:${d2(s % 60)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Reloj
 // ---------------------------------------------------------------------------
@@ -50,9 +60,11 @@ export async function vistaReloj(el, ctx) {
   try { const g = localStorage.getItem("obrapay.proyecto"); if (!abierto && g && proyectos.some((p) => p.id === g)) elegido = g; } catch { /* nada */ }
 
   let reg = 0; let extra = 0; let ganado = 0;
+  const porProyecto = new Map();
   turnosSemana.forEach((tu) => {
     const m = minutosTurno(tu.entrada, tu.salida, emp);
     reg += m.reg; extra += m.extra;
+    porProyecto.set(tu.proyecto_id, (porProyecto.get(tu.proyecto_id) || 0) + m.reg + m.extra);
     const tar = vigente(tarifas, fechaLocal(tu.entrada), "monto_hora") || 0;
     ganado += ((m.reg + m.extra) / 60) * tar;
   });
@@ -64,32 +76,44 @@ export async function vistaReloj(el, ctx) {
         ${crudo(ICONO.arriba)}<span>${crudo(t("aviso.tarifa", { antes: dinero(a.datos.antes), despues: dinero(a.datos.despues), desde: fmtDia(a.datos.desde, { day: "numeric", month: "long" }) }))}</span>
         <button type="button" class="btn-texto" data-leido="${a.id}">${t("comun.entendido")}</button></div>`)}
 
-      <section class="tarjeta reloj-tarjeta" aria-live="polite">
-        <div class="sub">${fmtDia(hoyLocal(), { weekday: "long", day: "numeric", month: "long" })} · ${t("reloj.cierra")}</div>
-        <div class="hora-grande">${fmtHora(ahora)}</div>
+      <section class="tarjeta reloj-tarjeta ${abierto ? "en-turno" : ""}" aria-live="polite">
+        <div>
+          <div class="estado-turno ${abierto ? "en-turno" : ""}"><span class="punto"></span>${abierto ? t("reloj.trabajando") : t("reloj.fuera")}</div>
+          <div class="nombre-turno">${abierto ? (abierto.proyectos?.nombre || "") : t("reloj.no_trabajando")}</div>
+        </div>
+        <div class="hora-grande" aria-live="off">${abierto ? cronometro(abierto.entrada) : fmtHora(ahora)}</div>
+        <div class="transcurrido">${abierto ? html`${t("reloj.entrada_a", { hora: fmtHora(abierto.entrada) })} · ` : ""}${fmtDia(hoyLocal(), { weekday: "long", day: "numeric", month: "long" })} · ${t("reloj.cierra")}</div>
         ${abierto
-          ? html`<div class="estado-turno en-turno"><span class="punto"></span>${t("reloj.en_turno", { hora: fmtHora(abierto.entrada), proyecto: abierto.proyectos?.nombre || "" })}</div>
-                 <div class="transcurrido">${t("reloj.llevas", { tiempo: horas((Date.now() - new Date(abierto.entrada)) / 60000) })}</div>`
-          : html`<div class="estado-turno"><span class="punto"></span>${t("reloj.fuera")}</div>`}
+          ? html`<button type="button" id="marcar" class="btn btn-reloj salida">${crudo(ICONO.reloj)} ${t("reloj.marcar_salida")}</button>`
+          : proyectos.length ? html`<div class="pequeno">${t("reloj.toca_proyecto")}</div>` : ""}
       </section>
 
       ${proyectos.length === 0 && !abierto
         ? html`<div class="vacio">${t("reloj.sin_proyectos")}</div>`
         : html`
         <fieldset class="lista-proyectos" ${abierto ? html`disabled` : ""}>
-          <legend class="etiqueta">${t("reloj.proyecto")}</legend>
-          ${proyectos.map((p) => html`
-            <label class="opcion-proyecto ${p.id === elegido ? "elegido" : ""}">
-              <input type="radio" name="proyecto" value="${p.id}" ${p.id === elegido ? html`checked` : ""}>
-              <span>${p.nombre}</span>
-            </label>`)}
+          <legend><h2>${t("reloj.proyecto")}</h2></legend>
+          <div class="rejilla-opciones">
+          ${proyectos.map((p, i) => {
+            const corriendo = abierto && abierto.proyecto_id === p.id;
+            const marcado = p.id === elegido;
+            return html`
+            <label class="opcion-proyecto ${marcado ? "elegido" : ""} ${corriendo ? "corriendo" : ""}">
+              <input type="radio" name="proyecto" value="${p.id}" ${marcado ? html`checked` : ""}>
+              <span class="marca-color" style="background: var(${COLORES[i % COLORES.length]})"></span>
+              <span class="nombre">${p.nombre}</span>
+              <span class="sub">${t("reloj.semana")} · <span class="mono">${horas(porProyecto.get(p.id) || 0)}</span></span>
+              <span class="tocar">${corriendo ? t("reloj.en_curso") : marcado ? t("reloj.elegido") : t("reloj.tocar")}</span>
+            </label>`;
+          })}
+          </div>
         </fieldset>
-        <button type="button" id="marcar" class="btn btn-reloj ${abierto ? "salida" : ""}" ${!abierto && !elegido ? html`disabled` : ""}>
-          ${crudo(ICONO.reloj)} ${abierto ? t("reloj.marcar_salida") : t("reloj.marcar_entrada")}
-        </button>
-        <p class="nota centro">${emp.gps_activo ? html`${crudo(ICONO.ubicacion)} ${t("reloj.gps_nota")} · ` : ""}${t("reloj.cambiar_nota")}</p>`}
+        ${abierto ? "" : html`<button type="button" id="marcar" class="btn btn-reloj" ${!elegido ? html`disabled` : ""}>
+          ${crudo(ICONO.reloj)} ${t("reloj.marcar_entrada")}
+        </button>`}
+        <p class="nota">${emp.gps_activo ? html`${crudo(ICONO.ubicacion)} ${t("reloj.gps_nota")} · ` : ""}${t("reloj.cambiar_nota")}</p>`}
 
-      <section class="tarjeta resumen-semana">
+      <section class="resumen-semana">
         <div><div class="sub">${t("reloj.semana")}</div><div class="num">${horas(reg + extra)}</div></div>
         <div><div class="sub">${t("reloj.extra")}</div><div class="num">${horas(extra)}</div></div>
         <div><div class="sub">${t("reloj.ganado")}</div><div class="num verde">${dinero(ganado)}</div></div>
@@ -100,10 +124,8 @@ export async function vistaReloj(el, ctx) {
 
   const reloj = setInterval(() => {
     const h = el.querySelector(".hora-grande");
-    const tr = el.querySelector(".transcurrido");
-    if (h) h.textContent = fmtHora(new Date().toISOString());
-    if (tr && abierto) tr.textContent = t("reloj.llevas", { tiempo: horas((Date.now() - new Date(abierto.entrada)) / 60000) });
-  }, 20000);
+    if (h) h.textContent = abierto ? cronometro(abierto.entrada) : fmtHora(new Date().toISOString());
+  }, abierto ? 1000 : 20000);
   alSalirDeVista(() => clearInterval(reloj));
 
   el.addEventListener("change", (ev) => {
