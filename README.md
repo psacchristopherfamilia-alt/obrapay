@@ -35,7 +35,6 @@ tests/web/                recorrido en navegador con Supabase simulado + revisi�
 scripts/test-db.sh        corre migraciones + pruebas en un Postgres local
 scripts/pg-local.sh       arranca un Postgres local para las pruebas
 respaldo/                 esquema y catálogos del prototipo anterior
-obrapay-app/              prototipo anterior (Next.js + Stripe), solo referencia: su base de datos se movió al esquema prototipo_anterior
 ```
 
 ## Reglas de nómina
