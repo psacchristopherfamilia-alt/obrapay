@@ -40,7 +40,9 @@ const es = {
   "aviso.tarifa": "<strong>Tu tarifa cambió:</strong> {antes} → {despues}/h desde el {desde}.",
 
   "reloj.cierra": "la semana cierra el miércoles 11:59 p.m.",
-  "reloj.en_turno": "En turno desde {hora} · {proyecto}", "reloj.llevas": "Llevas {tiempo}", "reloj.fuera": "Fuera de turno",
+  "reloj.trabajando": "Trabajando ahora", "reloj.fuera": "Fuera de turno", "reloj.no_trabajando": "No estás trabajando",
+  "reloj.entrada_a": "Entrada {hora}", "reloj.toca_proyecto": "Elige un proyecto abajo y marca entrada.",
+  "reloj.tocar": "Tocar para elegir", "reloj.elegido": "Elegido", "reloj.en_curso": "En curso",
   "reloj.proyecto": "Proyecto", "reloj.marcar_entrada": "Marcar entrada", "reloj.marcar_salida": "Marcar salida",
   "reloj.gps_nota": "Se usa tu ubicación al marcar",
   "reloj.cambiar_nota": "Para cambiar de proyecto: marca salida y entra en el otro.",
@@ -198,7 +200,9 @@ const en = {
   "aviso.tarifa": "<strong>Your rate changed:</strong> {antes} → {despues}/h starting {desde}.",
 
   "reloj.cierra": "the week closes Wednesday 11:59 p.m.",
-  "reloj.en_turno": "On shift since {hora} · {proyecto}", "reloj.llevas": "{tiempo} so far", "reloj.fuera": "Off shift",
+  "reloj.trabajando": "Working now", "reloj.fuera": "Off shift", "reloj.no_trabajando": "You are not working",
+  "reloj.entrada_a": "In at {hora}", "reloj.toca_proyecto": "Pick a project below and clock in.",
+  "reloj.tocar": "Tap to choose", "reloj.elegido": "Selected", "reloj.en_curso": "In progress",
   "reloj.proyecto": "Project", "reloj.marcar_entrada": "Clock in", "reloj.marcar_salida": "Clock out",
   "reloj.gps_nota": "Your location is used when you clock in or out",
   "reloj.cambiar_nota": "To switch projects: clock out, then clock in on the other one.",
@@ -356,7 +360,9 @@ const ht = {
   "aviso.tarifa": "<strong>Tarif ou chanje:</strong> {antes} → {despues}/è apati {desde}.",
 
   "reloj.cierra": "semèn nan fèmen mèkredi 11:59 p.m.",
-  "reloj.en_turno": "Ap travay depi {hora} · {proyecto}", "reloj.llevas": "Ou fè {tiempo}", "reloj.fuera": "Pa nan travay",
+  "reloj.trabajando": "Ap travay kounye a", "reloj.fuera": "Pa nan travay", "reloj.no_trabajando": "Ou pa ap travay",
+  "reloj.entrada_a": "Antre {hora}", "reloj.toca_proyecto": "Chwazi yon pwojè anba a epi make antre.",
+  "reloj.tocar": "Peze pou chwazi", "reloj.elegido": "Chwazi", "reloj.en_curso": "Ap travay",
   "reloj.proyecto": "Pwojè", "reloj.marcar_entrada": "Make antre", "reloj.marcar_salida": "Make sòti",
   "reloj.gps_nota": "Yo itilize kote ou ye lè w ap make",
   "reloj.cambiar_nota": "Pou chanje pwojè: make sòti, epi antre nan lòt la.",
