@@ -219,58 +219,67 @@ export async function vistaMisHoras(el, ctx) {
 // ---------------------------------------------------------------------------
 export async function vistaMiPago(el, ctx) {
   const yo = ctx.perfil.id;
-  const semanas = await listaSemanas(26);
-  let semana = semanas.find((s) => s.estado !== "abierta") || semanas[0];
-  const [tarifas, prestamos, historial] = await Promise.all([
-    api.sel("tarifas", `select=monto_hora,vigente_desde&perfil_id=eq.${yo}&order=vigente_desde.desc`),
+  const todas = await listaSemanas(52);
+  // Las semanas de las compañías tienen las mismas fechas: se muestra una por fecha de inicio.
+  const unicas = [];
+  todas.forEach((s) => { if (!unicas.some((u) => u.inicio === s.inicio)) unicas.push(s); });
+  let semana = unicas.find((s) => s.estado !== "abierta") || unicas[0];
+  const multi = ctx.empresas.length > 1;
+  const nombreEmpresa = (id) => ctx.empresas.find((e) => e.id === id)?.nombre || "";
+  const [prestamos, historial] = await Promise.all([
     prestamosConSaldo(yo),
     api.sel("notificaciones", `select=datos,creado_en&perfil_id=eq.${yo}&tipo=eq.cambio_tarifa&order=creado_en.desc&limit=3`),
   ]);
 
-  const cargar = async () => {
-    const [filas, proyectos] = await Promise.all([
-      api.rpc("nomina_semana", { p_semana: semana.id }),
-      api.rpc("nomina_semana_proyectos", { p_semana: semana.id }),
-    ]);
-    const n = filas[0];
-    const tarifa = vigente(tarifas, semana.fin, "monto_hora");
+  const bloque = (f) => {
     const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long" }); // pago: miércoles de cierre + 2
-    const estadoTexto = semana.estado === "abierta" ? t("pago.en_curso")
-      : semana.estado === "cerrada" ? t("pago.cerrada", { dia: viernes }) : t("pago.pagada");
+    const estadoTexto = f.estado_semana === "abierta" ? t("pago.en_curso")
+      : f.estado_semana === "cerrada" ? t("pago.cerrada", { dia: viernes }) : t("pago.pagada");
+    return html`
+      ${multi ? html`<div class="titulo-vista"><span class="pildora pildora-info">${f.empresa}</span><span class="sub">${estadoTexto}</span></div>` : ""}
+      <section class="tarjeta desglose">
+        <div class="linea"><span>${t("pago.tarifa")}</span><span class="mono">${dinero(f.tarifa)}</span></div>
+        <div class="linea"><span>${t("pago.horas", { reg: horas(f.minutos_reg), extra: horas(f.minutos_extra) })}</span><span class="mono">${horas(f.minutos_reg + f.minutos_extra)}</span></div>
+        <div class="linea fuerte"><span>${t("pago.bruto")}</span><span class="mono">${dinero(f.bruto)}</span></div>
+        <hr>
+        <div class="linea rojo"><span>${t("pago.seguro")}</span><span class="mono">−${dinero(f.seguro)}</span></div>
+        <div class="linea rojo"><span>${t("pago.prestamo")}</span><span class="mono">−${dinero(f.prestamo)}</span></div>
+        <hr>
+        <div class="linea total"><span>${t("pago.neto_corto")}</span><span class="mono">${dinero(f.neto)}</span></div>
+      </section>
+      ${f.proyectos.length ? html`<section class="tarjeta desglose">
+        <h2 class="etiqueta">${t("pago.por_proyecto")}</h2>
+        ${f.proyectos.map((p) => html`<div class="linea"><span>${p.proyecto} · ${horas(p.minutos)}</span><span class="mono">${dinero(p.bruto)}</span></div>`)}
+      </section>` : ""}`;
+  };
+
+  const cargar = async () => {
+    const filas = await api.rpc("mi_pago", { p_inicio: semana.inicio });
+    const neto = filas.reduce((a, f) => a + Number(f.neto), 0);
+    const estados = [...new Set(filas.map((f) => f.estado_semana))];
+    const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long" });
+    const estadoTexto = estados.length !== 1 ? "" : estados[0] === "abierta" ? t("pago.en_curso")
+      : estados[0] === "cerrada" ? t("pago.cerrada", { dia: viernes }) : t("pago.pagada");
     const activos = prestamos.filter((p) => p.activo && p.saldo > 0);
     el.innerHTML = String(html`
-      <div class="titulo-vista"><h1>${t("pago.titulo")}</h1>${selectorSemana(semanas, semana)}</div>
+      <div class="titulo-vista"><h1>${t("pago.titulo")}</h1>${selectorSemana(unicas, semana)}</div>
       ${historial.length ? html`<div class="banner banner-ok">${crudo(ICONO.arriba)}<span>${crudo(t("aviso.tarifa", { antes: dinero(historial[0].datos.antes), despues: dinero(historial[0].datos.despues), desde: fmtDia(historial[0].datos.desde, { day: "numeric", month: "long" }) }))}</span></div>` : ""}
       <section class="tarjeta oscura">
-        <div class="sub">${t("pago.neto")} · ${estadoTexto}</div>
-        <div class="monto-grande">${dinero(n ? n.neto : 0)}</div>
+        <div class="sub">${multi ? t("pago.total_cias") : t("pago.neto")}${estadoTexto ? ` · ${estadoTexto}` : ""}</div>
+        <div class="monto-grande">${dinero(neto)}</div>
         <div class="sub">${t("comun.semana")} ${fmtSemana(semana)}</div>
       </section>
-      ${!n ? html`<div class="vacio">${t("pago.vacio")}</div>` : html`
-      <section class="tarjeta desglose">
-        <div class="linea"><span>${t("pago.tarifa")}</span><span class="mono">${dinero(tarifa)}</span></div>
-        <div class="linea"><span>${t("pago.horas", { reg: horas(n.minutos_reg), extra: horas(n.minutos_extra) })}</span><span class="mono">${horas(n.minutos_reg + n.minutos_extra)}</span></div>
-        <div class="linea fuerte"><span>${t("pago.bruto")}</span><span class="mono">${dinero(n.bruto)}</span></div>
-        <hr>
-        <div class="linea rojo"><span>${t("pago.seguro")}</span><span class="mono">−${dinero(n.seguro)}</span></div>
-        <div class="linea rojo"><span>${t("pago.prestamo")}</span><span class="mono">−${dinero(n.prestamo)}</span></div>
-        <hr>
-        <div class="linea total"><span>${t("pago.neto_corto")}</span><span class="mono">${dinero(n.neto)}</span></div>
-      </section>
-      ${proyectos.length ? html`<section class="tarjeta desglose">
-        <h2 class="etiqueta">${t("pago.por_proyecto")}</h2>
-        ${proyectos.map((p) => html`<div class="linea"><span>${p.proyecto} · ${horas(p.minutos_reg + p.minutos_extra)}</span><span class="mono">${dinero(p.bruto)}</span></div>`)}
-      </section>` : ""}`}
+      ${!filas.length ? html`<div class="vacio">${t(multi ? "pago.sin_cia" : "pago.vacio")}</div>` : filas.map(bloque)}
       ${activos.length ? html`<section class="tarjeta desglose">
         <h2 class="etiqueta">${t("pago.prestamos")}</h2>
-        ${activos.map((p) => html`<div class="linea"><span>${t("pago.prestamo_de", { monto: dinero(p.monto_total), fecha: fmtDia(p.fecha, { day: "numeric", month: "short" }) })}</span><span class="mono">${t("pago.saldo", { saldo: dinero(p.saldo) })}</span></div>`)}
+        ${activos.map((p) => html`<div class="linea"><span>${multi ? `${nombreEmpresa(p.empresa_id)} · ` : ""}${t("pago.prestamo_de", { monto: dinero(p.monto_total), fecha: fmtDia(p.fecha, { day: "numeric", month: "short" }) })}</span><span class="mono">${t("pago.saldo", { saldo: dinero(p.saldo) })}</span></div>`)}
       </section>` : ""}
-      <p class="nota">${t("pago.nota")}</p>`);
+      <p class="nota">${t("pago.nota")}</p>
+      ${multi ? html`<p class="nota">${t("pago.cia_nota")}</p>` : ""}`);
     el.querySelector("#semana").addEventListener("change", (ev) => {
-      semana = semanas.find((s) => s.id === ev.target.value);
+      semana = unicas.find((s) => s.id === ev.target.value);
       cargar().catch((e) => aviso(mensajeError(e), "error"));
     });
   };
   await cargar();
 }
-

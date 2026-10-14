@@ -10,12 +10,13 @@ import {
 } from "./vistas/admin.js";
 import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
+import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
-export const ctx = { perfil: null, empresa: null, roles: [] };
+export const ctx = { perfil: null, empresa: null, empresas: [], roles: [] };
 
-// Rutas: [ruta, clave de texto, roles que la ven, función de la vista]
+// Rutas: [ruta, clave de texto, roles que la ven, función de la vista, solo con varias compañías]
 const RUTAS = [
   ["reloj", "nav.reloj", ["trabajador"], vistaReloj],
   ["horas", "nav.horas", ["trabajador"], vistaMisHoras],
@@ -27,11 +28,13 @@ const RUTAS = [
   ["trabajadores", "nav.trabajadores", ["admin"], vistaTrabajadores],
   ["proyectos", "nav.proyectos", ["admin"], vistaProyectos],
   ["prestamos", "nav.prestamos", ["admin"], vistaPrestamos],
+  ["gastos", "nav.gastos", ["admin", "supervisor"], vistaGastos],
+  ["companias", "nav.companias", ["admin", "dueno"], vistaCompanias, true],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
   ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
-const rutasDe = (roles) => RUTAS.filter(([, , r]) => r.some((x) => roles.includes(x)));
+const rutasDe = (roles) => RUTAS.filter(([, , r, , multi]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1));
 const esGerencia = () => ctx.roles.includes("admin") || ctx.roles.includes("dueno");
 
 let limpiezas = [];
@@ -40,14 +43,16 @@ function limpiar() { limpiezas.forEach((f) => { try { f(); } catch { /* nada */ 
 
 async function cargarContexto() {
   const yo = api.sesion().user_id;
-  const [perfiles, empresas] = await Promise.all([
+  const [perfiles, empresas, misEmpresas] = await Promise.all([
     api.sel("perfiles", `select=id,empresa_id,usuario,nombre,oficio,roles,idioma,activo,debe_cambiar_clave&id=eq.${yo}`),
     api.sel("empresas", "select=*"),
+    api.rpc("mis_empresas"),
   ]);
   const perfil = perfiles[0];
   if (!perfil || !perfil.activo) throw new Error(t("err.inactivo"));
   ctx.perfil = perfil;
   ctx.empresa = empresas[0];
+  ctx.empresas = misEmpresas || [];
   ctx.roles = perfil.roles || [];
   fijarIdioma(perfil.idioma);
   fijarZona(ctx.empresa.zona_horaria);
@@ -57,6 +62,15 @@ function selectorIdioma(id) {
   return html`<label class="idioma"><span class="oculto">${t("comun.idioma")}</span>
     <select id="${id}" aria-label="${t("comun.idioma")}">
       ${IDIOMAS.map(([c, n]) => html`<option value="${c}" ${c === idioma() ? html`selected` : ""}>${n}</option>`)}
+    </select></label>`;
+}
+
+// Con más de una compañía, quien tiene acceso elige con cuál trabaja; se guarda en el servidor.
+function selectorEmpresa() {
+  if (ctx.empresas.length < 2) return "";
+  return html`<label class="idioma"><span class="oculto">${t("emp.compania")}</span>
+    <select id="empresa-app" aria-label="${t("emp.compania")}">
+      ${ctx.empresas.map((e) => html`<option value="${e.id}" ${e.id === ctx.empresa.id ? html`selected` : ""}>${e.nombre}</option>`)}
     </select></label>`;
 }
 
@@ -72,6 +86,7 @@ function marco(rutaActual) {
             <div class="marca">ObraPay<span>${ctx.empresa.nombre}</span></div>
             <div class="lateral-pie">
               <div class="quien">${ctx.perfil.nombre}<span>${ctx.roles.map((r) => t(`rol.${r}`)).join(" · ")}</span></div>
+              ${selectorEmpresa()}
               ${selectorIdioma("idioma-app")}
               <button type="button" class="btn btn-fantasma btn-chico" id="salir">${crudo(ICONO.salir)} ${t("comun.salir")}</button>
             </div>
@@ -84,8 +99,9 @@ function marco(rutaActual) {
   return html`
     <div class="movil">
       <header class="cabecera">
-        <div><div class="marca-app">ObraPay</div><p class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })} · ${ctx.empresa.nombre}</p></div>
+        <div><div class="marca-app">ObraPay</div><p class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })}${ctx.empresas.length < 2 ? ` · ${ctx.empresa.nombre}` : ""}</p></div>
         <div class="cab-acciones">
+          ${selectorEmpresa()}
           ${selectorIdioma("idioma-app")}
           <button type="button" class="btn-icono" id="salir" aria-label="${t("comun.salir")}">${crudo(ICONO.salir)}</button>
         </div>
@@ -126,6 +142,13 @@ async function mostrar() {
   raiz.querySelector("#salir").addEventListener("click", async (ev) => {
     await ocupado(ev.currentTarget, () => api.salir());
   });
+  raiz.querySelector("#empresa-app")?.addEventListener("change", async (ev) => {
+    try {
+      await api.rpc("elegir_empresa", { p_empresa: ev.target.value });
+      ctx.perfil = null; // se vuelve a cargar todo con la compañía elegida
+      mostrar();
+    } catch (e) { aviso(mensajeError(e), "error"); ev.target.value = ctx.empresa.id; }
+  });
   raiz.querySelector("#idioma-app").addEventListener("change", async (ev) => {
     const nuevo = ev.target.value;
     fijarIdioma(nuevo);
@@ -150,7 +173,7 @@ export function recargarVista() { mostrar(); }
 
 function iniciar() { ctx.perfil = null; mostrar(); }
 
-api.alSalir(() => { ctx.perfil = null; ctx.roles = []; limpiar(); mostrar(); aviso(t("comun.sesion_cerrada"), "info"); });
+api.alSalir(() => { ctx.perfil = null; ctx.roles = []; ctx.empresas = []; limpiar(); mostrar(); aviso(t("comun.sesion_cerrada"), "info"); });
 window.addEventListener("hashchange", mostrar);
 window.addEventListener("unhandledrejection", (ev) => { aviso(mensajeError(ev.reason), "error"); });
 mostrar();

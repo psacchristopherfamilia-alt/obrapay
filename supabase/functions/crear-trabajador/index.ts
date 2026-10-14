@@ -50,11 +50,19 @@ Deno.serve(async (req) => {
 
   const { data: admin } = await servicio
     .from("perfiles")
-    .select("id, empresa_id, roles, activo")
+    .select("id, empresa_id, empresa_activa_id, roles, activo")
     .eq("id", sesion.user.id)
     .single();
   if (!admin?.activo || !admin.roles.includes("admin")) {
     return responder(403, { error: "No tienes permiso para esta acción" });
+  }
+
+  // Compañía activa del admin: la que eligió en el selector, si sigue siendo suya; si no, la de inicio.
+  let empId: string = admin.empresa_id;
+  if (admin.empresa_activa_id && admin.empresa_activa_id !== admin.empresa_id) {
+    const { data: m } = await servicio.from("perfil_empresas").select("empresa_id")
+      .eq("perfil_id", admin.id).eq("empresa_id", admin.empresa_activa_id).is("baja_en", null).maybeSingle();
+    if (m) empId = admin.empresa_activa_id;
   }
 
   let cuerpo: Crear | Restablecer;
@@ -67,8 +75,11 @@ Deno.serve(async (req) => {
   // 2a. Restablecer contraseña de alguien de su empresa
   if (cuerpo.accion === "restablecer") {
     const { data: perfil } = await servicio
-      .from("perfiles").select("id, empresa_id").eq("id", cuerpo.perfil_id).single();
-    if (!perfil || perfil.empresa_id !== admin.empresa_id) return responder(404, { error: "Trabajador no encontrado" });
+      .from("perfiles").select("id").eq("id", cuerpo.perfil_id).single();
+    const { data: miembro } = perfil
+      ? await servicio.from("perfil_empresas").select("perfil_id").eq("perfil_id", perfil.id).eq("empresa_id", empId).is("baja_en", null).maybeSingle()
+      : { data: null };
+    if (!perfil || !miembro) return responder(404, { error: "Trabajador no encontrado" });
     const clave = claveTemporal();
     const { error } = await servicio.auth.admin.updateUserById(perfil.id, { password: clave });
     if (error) return responder(500, { error: "No se pudo restablecer la contraseña" });
@@ -108,7 +119,7 @@ Deno.serve(async (req) => {
 
   const id = creado.user.id;
   const { error: errPerfil } = await servicio.from("perfiles").insert({
-    id, empresa_id: admin.empresa_id, usuario, nombre: cuerpo.nombre.trim(),
+    id, empresa_id: empId, usuario, nombre: cuerpo.nombre.trim(),
     oficio: cuerpo.oficio?.trim() || null, roles, idioma: cuerpo.idioma ?? "es",
   });
   if (errPerfil) {
@@ -120,11 +131,11 @@ Deno.serve(async (req) => {
   if (roles.includes("trabajador")) {
     const [t, s] = await Promise.all([
       servicio.from("tarifas").insert({
-        empresa_id: admin.empresa_id, perfil_id: id, monto_hora: cuerpo.tarifa,
+        empresa_id: empId, perfil_id: id, monto_hora: cuerpo.tarifa,
         vigente_desde: cuerpo.vigente_desde, creado_por: admin.id,
       }),
       servicio.from("seguros").insert({
-        empresa_id: admin.empresa_id, perfil_id: id, porcentaje: cuerpo.seguro_pct,
+        empresa_id: empId, perfil_id: id, porcentaje: cuerpo.seguro_pct,
         vigente_desde: cuerpo.vigente_desde, creado_por: admin.id,
       }),
     ]);
@@ -136,7 +147,7 @@ Deno.serve(async (req) => {
   }
 
   await servicio.from("eventos_admin").insert({
-    empresa_id: admin.empresa_id, tipo: "trabajador_creado", por: admin.id,
+    empresa_id: empId, tipo: "trabajador_creado", por: admin.id,
     detalle: { perfil: id, usuario, roles },
   });
 

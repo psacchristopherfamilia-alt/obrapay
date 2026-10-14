@@ -301,6 +301,7 @@ function mostrarCredenciales(usuario, clave, titulo) {
 
 export async function vistaTrabajadores(el, ctx) {
   let perfiles = []; let tarifas = [];
+  const otras = ctx.empresas.filter((e) => e.id !== ctx.empresa.id); // las demás compañías de este administrador
   const hoy = hoyLocal();
 
   const cargar = async () => {
@@ -327,6 +328,8 @@ export async function vistaTrabajadores(el, ctx) {
               <td><div class="acciones-fila">
                 ${marca ? html`<button type="button" class="btn btn-sec btn-chico" data-tarifa="${p.id}">${t("trab.tarifa")}</button>` : ""}
                 ${p.id !== ctx.perfil.id ? html`<button type="button" class="btn btn-sec btn-chico" data-editar="${p.id}">${t("trab.editar")}</button>` : ""}
+                ${otras.length && p.id !== ctx.perfil.id ? html`<button type="button" class="btn btn-sec btn-chico" data-compartir="${p.id}">${t("trab.compartir")}</button>
+                  <button type="button" class="btn btn-sec btn-chico" data-quitar-cia="${p.id}">${t("trab.quitar_cia")}</button>` : ""}
               </div></td></tr>`;
           })}</tbody>
         </table>
@@ -414,6 +417,42 @@ export async function vistaTrabajadores(el, ctx) {
     });
   };
 
+  const abrirCompartir = (perfil) => {
+    const marca = perfil.roles.includes("trabajador");
+    const d = abrirModal(t("trab.compartir_titulo", { empresa: otras.length === 1 ? otras[0].nombre : "…" }), html`
+      <form class="form" novalidate>
+        ${otras.length > 1 ? html`<div class="campo"><label for="c-empresa">${t("emp.compania")}</label>
+          <select id="c-empresa" name="empresa">${otras.map((e) => html`<option value="${e.id}">${e.nombre}</option>`)}</select></div>` : html`<input type="hidden" name="empresa" value="${otras[0].id}">`}
+        <p class="pequeno">${t("trab.compartir_texto", { nombre: perfil.nombre, empresa: otras.length === 1 ? otras[0].nombre : "…" })}</p>
+        ${marca ? html`<div class="campo"><label for="c-tarifa">${t("trab.tarifa_otra", { empresa: otras.length === 1 ? otras[0].nombre : "…" })}</label>
+          <input id="c-tarifa" name="tarifa" type="number" min="0.01" step="0.01" inputmode="decimal" required></div>` : ""}
+        <p class="error-form" role="alert" hidden></p>
+        <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
+          <button type="submit" class="btn btn-pri">${t("trab.compartir_btn")}</button></div>
+      </form>`);
+    const f = d.querySelector("form");
+    f.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const err = f.querySelector(".error-form");
+      const tarifa = marca ? Number(f.tarifa.value) : null;
+      if (marca && (!f.tarifa.value || Number.isNaN(tarifa) || tarifa <= 0)) {
+        err.hidden = false; err.textContent = t("trab.valor_invalido"); return;
+      }
+      try {
+        await ocupado(f.querySelector("[type=submit]"), () => api.rpc("compartir_trabajador", { p_perfil: perfil.id, p_empresa: f.empresa.value, p_tarifa: tarifa }));
+        cerrarModal(); aviso(t("trab.compartido")); await cargar();
+      } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
+    });
+  };
+
+  const quitarDeAqui = async (perfil) => {
+    try {
+      if (!(await confirmar(t("trab.quitar_cia"), t("trab.quitar_texto", { nombre: perfil.nombre }), { boton: t("trab.quitar_cia"), peligro: true }))) return;
+      await api.rpc("quitar_de_empresa", { p_perfil: perfil.id });
+      aviso(t("trab.quitado")); await cargar();
+    } catch (e) { aviso(mensajeError(e), "error"); }
+  };
+
   const restablecer = async (p) => {
     try {
       if (!(await confirmar(t("trab.restablecer_t"), t("trab.restablecer_txt", { nombre: p.nombre }), { boton: t("trab.restablecer") }))) return;
@@ -468,6 +507,8 @@ export async function vistaTrabajadores(el, ctx) {
     try {
       if (b.id === "nuevo") abrirNuevo();
       else if (b.dataset.tarifa) abrirMonto(buscar(b.dataset.tarifa));
+      else if (b.dataset.compartir) abrirCompartir(buscar(b.dataset.compartir));
+      else if (b.dataset.quitarCia) await quitarDeAqui(buscar(b.dataset.quitarCia));
       else if (b.dataset.editar) abrirEditar(buscar(b.dataset.editar));
     } catch (e) { aviso(mensajeError(e), "error"); }
   });

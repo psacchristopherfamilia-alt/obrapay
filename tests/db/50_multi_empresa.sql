@@ -198,6 +198,13 @@ select test.igual((select tarifa from public.nomina_semana(pg_temp.sem('e1', '20
 select test.como(pg_temp.id('c1'));
 select pg_temp.en('e2');
 select test.igual((select count(*)::int from public.nomina_semana(pg_temp.sem('e2', '2027-03-04'))), 1, 'Juan ve su pago de la dos (solo el suyo)');
+select pg_temp.en('e1');
+select test.igual((select count(*)::int from public.mi_pago(public.semana_inicio_de('2027-03-04'))), 2, 'mi_pago: Juan ve una fila por compañía sin cambiar de activa');
+select test.igual((select neto from public.mi_pago(public.semana_inicio_de('2027-03-04')) where empresa_id = pg_temp.id('e1')), 55.88, 'mi_pago: neto de la uno');
+select test.igual((select neto from public.mi_pago(public.semana_inicio_de('2027-03-04')) where empresa_id = pg_temp.id('e2')), 36.60, 'mi_pago: neto de la dos');
+select test.igual((select tarifa from public.mi_pago(public.semana_inicio_de('2027-03-04')) where empresa_id = pg_temp.id('e2')), 20.00, 'mi_pago: tarifa de la dos');
+select test.igual((select jsonb_array_length(proyectos) from public.mi_pago(public.semana_inicio_de('2027-03-04')) where empresa_id = pg_temp.id('e1')), 1, 'mi_pago: un proyecto en la uno');
+select test.igual((select count(*)::int from public.mi_pago(public.semana_inicio_de('2027-03-04')) where empresa_id = pg_temp.id('e1') and neto <> 55.88), 0, 'mi_pago: solo muestra lo suyo');
 select test.igual((select count(*)::int from public.semanas where id = pg_temp.sem('e1', '2027-03-04')), 1, 'Juan ve la semana de la uno aunque tenga la dos activa');
 reset role;
 

@@ -34,6 +34,8 @@ const BASE = `http://localhost:${servidor.address().port}/`;
 const id = (s) => `00000000-0000-0000-0000-0000000000${s}`;
 const EMP = { id: id("e1"), nombre: "Mi empresa", zona_horaria: "America/Grand_Turk", gps_activo: false, gps_modo: "marcar",
   hora_extra_desde: "17:00:00", hora_cierre_turno: "23:00:00", almuerzo_inicio: "12:00:00", almuerzo_fin: "13:00:00" };
+const EMP2 = { id: id("e2"), nombre: "Current Ltd" };
+const MIS_EMPRESAS = [{ id: EMP2.id, nombre: EMP2.nombre, zona_horaria: EMP.zona_horaria, activa: false }, { id: EMP.id, nombre: EMP.nombre, zona_horaria: EMP.zona_horaria, activa: true }];
 const P = {
   admin: { id: id("a1"), usuario: "admin", nombre: "Administración", oficio: null, roles: ["admin"] },
   dueno: { id: id("d1"), usuario: "dueno", nombre: "Dueño", oficio: null, roles: ["dueno"] },
@@ -119,6 +121,17 @@ function simulador(quien, llamadas) {
   };
   const RPC = {
     semana_actual: () => id("s2"),
+    mis_empresas: () => MIS_EMPRESAS,
+    elegir_empresa: () => null,
+    mi_pago: () => [
+      { empresa_id: EMP2.id, empresa: EMP2.nombre, semana_id: id("t1"), estado_semana: "cerrada", minutos_reg: 240, minutos_extra: 0, tarifa: 18, bruto: 72, seguro: 6.12, prestamo: 10, neto: 55.88, proyectos: [{ proyecto: "Torre Sur", minutos: 240, bruto: 72 }] },
+      { empresa_id: EMP.id, empresa: EMP.nombre, semana_id: id("s1"), estado_semana: "cerrada", minutos_reg: 120, minutos_extra: 0, tarifa: 20, bruto: 40, seguro: 3.4, prestamo: 0, neto: 36.6, proyectos: [{ proyecto: "Villa Grace Bay", minutos: 120, bruto: 40 }] }],
+    resumen_empresas: () => [
+      { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: id("g1"), proyecto: "Torre Sur", concepto: "mano_obra", monto: 4100 },
+      { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: null, proyecto: null, concepto: "nib_empleador", monto: 420 },
+      { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: id("g1"), proyecto: "Torre Sur", concepto: "materiales", monto: 1250 },
+      { empresa_id: EMP.id, empresa: EMP.nombre, proyecto_id: id("f1"), proyecto: "Villa Grace Bay", concepto: "mano_obra", monto: 6300 },
+      { empresa_id: EMP.id, empresa: EMP.nombre, proyecto_id: null, proyecto: null, concepto: "poliza", monto: 900 }],
     nomina_semana: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA[a.p_semana] : NOMINA[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     nomina_semana_proyectos: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA_PROY[a.p_semana] : NOMINA_PROY[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     reporte_mensual: () => [{ perfil_id: P.juan.id, nombre: "Juan Pérez", semanas: 2, minutos_reg: 4800, minutos_extra: 400, bruto: 1600, seguro: 48, prestamo: 250, neto: 1302 }],
@@ -140,7 +153,10 @@ function simulador(quien, llamadas) {
     tasas_estatutarias: () => [
       { agencia: "NIB", tasa_empleado: 5.5, tasa_empleador: 6.5, tope_mensual: 6000, dia_vencimiento: 15, vigente_desde: "2026-01-01" },
       { agencia: "NHIP", tasa_empleado: 3, tasa_empleador: 3, tope_mensual: 7800, dia_vencimiento: 14, vigente_desde: "2026-01-01" }],
-    proyecto_supervisores: () => [{ proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
+    gastos: () => [
+      { id: id("x1"), proyecto_id: id("f1"), categoria: "materiales", monto: 120, fecha: "2026-10-14", descripcion: "Tubería PVC", proveedor: "Ferretería Island", anulado: false, anulado_motivo: null, proyectos: { nombre: "Villa Grace Bay" } },
+      { id: id("x2"), proyecto_id: null, categoria: "poliza", monto: 900, fecha: "2026-10-01", descripcion: null, proveedor: "Aseguradora", anulado: true, anulado_motivo: "duplicado", proyectos: null }],
+    proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
     const req = route.request();
@@ -179,10 +195,10 @@ const navegador = await chromium.launch({ executablePath: "/opt/pw-browsers/chro
 const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
-  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar"], idiomas: ["es"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "reportes", "seguros", "ajustes"], idiomas: ["es"] },
+  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos"], idiomas: ["es"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "companias", "reportes", "seguros", "ajustes"], idiomas: ["es"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -206,7 +222,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -437,6 +453,61 @@ await flujo("dueño ve los seguros sin poder editar", P.dueno, 1360, async (pg) 
   await pg.goto(`${BASE}#/seguros`);
   await pg.waitForSelector("table");
   esperar((await pg.locator("[data-tasa], [data-datos]").count()) === 0, "el dueño ve botones de edición");
+});
+
+
+await flujo("trabajador en dos compañías ve un pago por compañía", P.juan, 390, async (pg) => {
+  await pg.goto(`${BASE}#/pago`);
+  await pg.waitForSelector(".monto-grande");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("$92.48"), "no suma el neto de las dos compañías");
+  esperar(txt.includes("Current Ltd") && txt.includes("$55.88") && txt.includes("$36.60"), "falta el bloque de cada compañía");
+});
+
+await flujo("elegir compañía activa", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/nomina`);
+  await pg.waitForSelector("#empresa-app");
+  await pg.selectOption("#empresa-app", EMP2.id);
+  await pg.waitForTimeout(400);
+  esperar(ll.some((x) => x.ruta.endsWith("/elegir_empresa") && x.cuerpo.p_empresa === EMP2.id), "no eligió la compañía");
+});
+
+await flujo("supervisor registra un gasto", P.ramon, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/gastos`);
+  await pg.waitForSelector("#form-gasto");
+  await pg.selectOption("#g-categoria", "materiales");
+  await pg.fill("#g-monto", "0");
+  await pg.click("#form-gasto [type=submit]");
+  esperar(!ll.some((x) => x.ruta.endsWith("/registrar_gasto")), "envió un gasto en cero");
+  await pg.fill("#g-monto", "45.5");
+  await pg.click("#form-gasto [type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/registrar_gasto"));
+  esperar(g && g.cuerpo.p_monto === 45.5 && g.cuerpo.p_proyecto === id("f1") && g.cuerpo.p_categoria === "materiales", "gasto mal enviado");
+  esperar((await pg.locator("[data-anular]").count()) === 0, "el supervisor ve el botón de anular");
+});
+
+await flujo("admin comparte un trabajador y anula un gasto", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/trabajadores`);
+  await pg.click(`[data-compartir="${P.juan.id}"]`);
+  await pg.fill("#c-tarifa", "20");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/compartir_trabajador") && x.cuerpo.p_perfil === P.juan.id && x.cuerpo.p_empresa === EMP2.id && x.cuerpo.p_tarifa === 20), "no compartió");
+  await pg.goto(`${BASE}#/gastos`);
+  await pg.click(`[data-anular="${id("x1")}"]`);
+  await pg.fill("#a-motivo", "Error de monto");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/anular_gasto") && x.cuerpo.p_motivo === "Error de monto"), "no anuló el gasto");
+});
+
+await flujo("dueño ve el resumen separado por compañía", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/companias`);
+  await pg.waitForSelector(".kpis");
+  const txt = await pg.innerText("#vista");
+  esperar(/current ltd/i.test(txt) && /mi empresa/i.test(txt), "no muestra las dos compañías");
+  esperar(txt.includes("$5,770.00") && txt.includes("$7,200.00") && txt.includes("$12,970.00"), "totales por compañía incorrectos");
 });
 
 await navegador.close();
