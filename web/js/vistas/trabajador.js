@@ -43,16 +43,20 @@ function cronometro(entrada) {
 export async function vistaReloj(el, ctx) {
   const yo = ctx.perfil.id;
   const emp = ctx.empresa;
+  // Cada turno y cada proyecto usa los ajustes de su propia compañía (horas extra, almuerzo, GPS).
+  const ajustesDe = (id) => ctx.ajustes[id] || emp;
+  const multi = ctx.empresas.length > 1;
+  const nombreEmpresa = (id) => ctx.empresas.find((e) => e.id === id)?.nombre || "";
   const semana = await semanaActual();
   const { desde, hasta } = rangoSemana(semana, emp.zona_horaria);
   const [asignados, turnosSemana, tarifas, avisos] = await Promise.all([
-    api.sel("proyecto_trabajadores", `select=proyecto_id,proyectos(id,nombre,activo)&perfil_id=eq.${yo}`),
-    api.sel("turnos", `select=id,proyecto_id,entrada,salida,estado,proyectos(nombre)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
-    api.sel("tarifas", `select=monto_hora,vigente_desde&perfil_id=eq.${yo}`),
+    api.sel("proyecto_trabajadores", `select=proyecto_id,proyectos(id,nombre,activo,empresa_id)&perfil_id=eq.${yo}`),
+    api.sel("turnos", `select=id,proyecto_id,entrada,salida,estado,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
+    api.sel("tarifas", `select=empresa_id,monto_hora,vigente_desde&perfil_id=eq.${yo}`),
     api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${yo}&leida=eq.false&tipo=eq.cambio_tarifa&order=creado_en.desc`),
   ]);
   // Un turno abierto de una semana anterior también cuenta.
-  const abiertos = await api.sel("turnos", `select=id,proyecto_id,entrada,proyectos(nombre)&perfil_id=eq.${yo}&salida=is.null`);
+  const abiertos = await api.sel("turnos", `select=id,proyecto_id,entrada,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&salida=is.null`);
   const abierto = abiertos[0] || null;
   const proyectos = asignados.map((a) => a.proyectos).filter((p) => p && p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
@@ -62,10 +66,11 @@ export async function vistaReloj(el, ctx) {
   let reg = 0; let extra = 0; let ganado = 0;
   const porProyecto = new Map();
   turnosSemana.forEach((tu) => {
-    const m = minutosTurno(tu.entrada, tu.salida, emp);
+    const eid = tu.proyectos?.empresa_id;
+    const m = minutosTurno(tu.entrada, tu.salida, ajustesDe(eid));
     reg += m.reg; extra += m.extra;
     porProyecto.set(tu.proyecto_id, (porProyecto.get(tu.proyecto_id) || 0) + m.reg + m.extra);
-    const tar = vigente(tarifas, fechaLocal(tu.entrada), "monto_hora") || 0;
+    const tar = vigente(tarifas.filter((x) => !eid || x.empresa_id === eid), fechaLocal(tu.entrada), "monto_hora") || 0;
     ganado += ((m.reg + m.extra) / 60) * tar;
   });
 
@@ -102,6 +107,7 @@ export async function vistaReloj(el, ctx) {
               <input type="radio" name="proyecto" value="${p.id}" ${marcado ? html`checked` : ""}>
               <span class="marca-color" style="background: var(${COLORES[i % COLORES.length]})"></span>
               <span class="nombre">${p.nombre}</span>
+              ${multi ? html`<span class="sub">${nombreEmpresa(p.empresa_id)}</span>` : ""}
               <span class="sub">${t("reloj.semana")} · <span class="mono">${horas(porProyecto.get(p.id) || 0)}</span></span>
               <span class="tocar">${corriendo ? t("reloj.en_curso") : marcado ? t("reloj.elegido") : t("reloj.tocar")}</span>
             </label>`;
@@ -111,7 +117,7 @@ export async function vistaReloj(el, ctx) {
         ${abierto ? "" : html`<button type="button" id="marcar" class="btn btn-reloj" ${!elegido ? html`disabled` : ""}>
           ${crudo(ICONO.reloj)} ${t("reloj.marcar_entrada")}
         </button>`}
-        <p class="nota">${emp.gps_activo ? html`${crudo(ICONO.ubicacion)} ${t("reloj.gps_nota")} · ` : ""}${t("reloj.cambiar_nota")}</p>`}
+        <p class="nota">${ajustesDe(proyectos.find((p) => p.id === elegido)?.empresa_id).gps_activo ? html`${crudo(ICONO.ubicacion)} ${t("reloj.gps_nota")} · ` : ""}${t("reloj.cambiar_nota")}</p>`}
 
       <section class="resumen-semana">
         <div><div class="sub">${t("reloj.semana")}</div><div class="num">${horas(reg + extra)}</div></div>
@@ -149,7 +155,8 @@ export async function vistaReloj(el, ctx) {
     try {
       await ocupado(boton, async () => {
         let pos = { lat: null, lng: null };
-        if (emp.gps_activo) pos = await ubicacion();
+        const proy = abierto ? abierto.proyectos : proyectos.find((p) => p.id === elegido);
+        if (ajustesDe(proy?.empresa_id).gps_activo) pos = await ubicacion();
         if (abierto) await api.rpc("marcar_salida", { p_lat: pos.lat, p_lng: pos.lng });
         else await api.rpc("marcar_entrada", { p_proyecto: elegido, p_lat: pos.lat, p_lng: pos.lng });
       });
@@ -172,17 +179,23 @@ export function selectorSemana(semanas, elegida) {
 export async function vistaMisHoras(el, ctx) {
   const yo = ctx.perfil.id;
   const emp = ctx.empresa;
-  const semanas = await listaSemanas(12);
+  const ajustesDe = (id) => ctx.ajustes[id] || emp;
+  const multi = ctx.empresas.length > 1;
+  const nombreEmpresa = (id) => ctx.empresas.find((e) => e.id === id)?.nombre || "";
+  // Las semanas de las compañías tienen las mismas fechas: se muestra una por fecha de inicio.
+  const todas = await listaSemanas(24);
+  const semanas = [];
+  todas.forEach((s) => { if (!semanas.some((u) => u.inicio === s.inicio)) semanas.push(s); });
   let semana = semanas.find((s) => s.estado === "abierta") || semanas[0];
 
   const cargar = async () => {
     const { desde, hasta } = rangoSemana(semana, emp.zona_horaria);
-    const turnos = await api.sel("turnos", `select=id,entrada,salida,estado,cierre_automatico,corregido,proyectos(nombre)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`);
+    const turnos = await api.sel("turnos", `select=id,entrada,salida,estado,cierre_automatico,corregido,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`);
     const porDia = new Map();
     let totReg = 0; let totExtra = 0;
     turnos.forEach((tu) => {
       const dia = fechaLocal(tu.entrada);
-      const m = minutosTurno(tu.entrada, tu.salida, emp);
+      const m = minutosTurno(tu.entrada, tu.salida, ajustesDe(tu.proyectos?.empresa_id));
       totReg += m.reg; totExtra += m.extra;
       if (!porDia.has(dia)) porDia.set(dia, []);
       porDia.get(dia).push({ ...tu, m });
@@ -196,7 +209,7 @@ export async function vistaMisHoras(el, ctx) {
           ${lista.map((tu) => html`
             <div class="fila-turno">
               <div>
-                <div class="fuerte">${tu.proyectos?.nombre || ""}</div>
+                <div class="fuerte">${tu.proyectos?.nombre || ""}${multi ? html` · <span class="sub">${nombreEmpresa(tu.proyectos?.empresa_id)}</span>` : ""}</div>
                 <div class="mono pequeno">${fmtHora(tu.entrada)} – ${tu.salida ? fmtHora(tu.salida) : "…"} · ${horas(tu.m.reg)}${tu.m.extra ? html` + ${horas(tu.m.extra)} ${t("horas.extra")}` : ""}</div>
                 ${tu.cierre_automatico ? html`<div class="nota alerta">${crudo(ICONO.alerta)} ${t("horas.cierre_auto")}</div>` : ""}
                 ${tu.corregido ? html`<div class="nota">${t("horas.corregido")}</div>` : ""}

@@ -17,7 +17,8 @@ select test.como(pg_temp.yo('c1'));
 select test.ok(public.marcar_entrada(pg_temp.yo('f1')) is not null, 'Juan marca entrada en Villa Grace Bay');
 select test.falla($$select public.marcar_entrada('00000000-0000-0000-0000-0000000000f2')$$, 'Ya tienes un turno abierto', 'no permite dos turnos abiertos');
 select test.ok(public.marcar_salida() is not null, 'Juan marca salida');
-select test.igual((select estado from public.turnos where perfil_id = pg_temp.yo('c1') order by creado_en desc limit 1), 'por_aprobar', 'al salir, el turno queda por aprobar');
+select test.igual((select estado from public.turnos where perfil_id = pg_temp.yo('c1') order by creado_en desc limit 1), 'aprobado', 'al salir antes de la hora extra, el turno queda aprobado solo');
+select test.igual((select aprobado_por is null and aprobado_en is not null from public.turnos where perfil_id = pg_temp.yo('c1') order by creado_en desc limit 1), true, 'la aprobación automática no tiene aprobador');
 select test.falla($$select public.marcar_salida()$$, 'No tienes un turno abierto', 'no permite salida sin entrada');
 
 select test.como(pg_temp.yo('c3'));
@@ -47,9 +48,15 @@ select test.como(pg_temp.yo('c3'));
 select public.marcar_entrada(pg_temp.yo('f1'), 21.7000, -72.3000);
 select test.igual((select fuera_de_area from public.turnos where perfil_id = pg_temp.yo('c3') and salida is null), true, 'modo marcar: deja marcar pero lo señala');
 select public.marcar_salida(21.7000, -72.3000);
+select test.igual((select estado from public.turnos where perfil_id = pg_temp.yo('c3') order by creado_en desc limit 1), 'por_aprobar', 'marcar fuera del área deja el turno por aprobar');
 
 reset role;
 update public.empresas set gps_activo = false;
+
+-- Hora extra: solo lo que pasa de las 5:00 p.m. espera aprobación
+select test.igual(public._requiere_aprobacion(pg_temp.yo('e1'), timestamp '2027-03-04 07:00' at time zone 'America/Grand_Turk', timestamp '2027-03-04 15:00' at time zone 'America/Grand_Turk', false), false, '7:00 a.m. a 3:00 p.m. (hora local) no requiere aprobación');
+select test.igual(public._requiere_aprobacion(pg_temp.yo('e1'), timestamp '2027-03-04 07:00' at time zone 'America/Grand_Turk', timestamp '2027-03-04 17:30' at time zone 'America/Grand_Turk', false), true, 'salir después de las 5 p.m. requiere aprobación');
+select test.igual(public._requiere_aprobacion(pg_temp.yo('e1'), timestamp '2027-03-04 07:00' at time zone 'America/Grand_Turk', timestamp '2027-03-04 15:00' at time zone 'America/Grand_Turk', true), true, 'fuera del área requiere aprobación aunque no haya extra');
 
 -- ===========================================================================
 -- B. Aprobación

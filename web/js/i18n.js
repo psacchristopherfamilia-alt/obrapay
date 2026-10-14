@@ -47,7 +47,7 @@ const es = {
   "reloj.gps_nota": "Se usa tu ubicación al marcar",
   "reloj.cambiar_nota": "Para cambiar de proyecto: marca salida y entra en el otro.",
   "reloj.semana": "Esta semana", "reloj.extra": "Extra (después de 5 p.m.)", "reloj.ganado": "Llevas ganado",
-  "reloj.estimado": "Estimado antes de descuentos. Se confirma cuando el supervisor aprueba tus horas.",
+  "reloj.estimado": "Estimado antes de descuentos. Las horas hasta las 5 p.m. se aprueban solas; lo que pase de las 5 p.m. se confirma cuando el supervisor lo aprueba.",
   "reloj.sin_proyectos": "No tienes proyectos asignados. Habla con tu supervisor.",
   "reloj.confirmar_salida_t": "¿Marcar salida?", "reloj.confirmar_salida": "Vas a cerrar tu turno en {proyecto}.",
   "reloj.entrada_ok": "Entrada marcada", "reloj.salida_ok": "Salida marcada",
@@ -74,7 +74,7 @@ const es = {
   "turno.corregido_ok": "Turno corregido y aprobado", "turno.aprobado_ok": "Turno aprobado", "turno.aprobados_n": "{n} turnos aprobados",
 
   "aprobar.titulo": "Por aprobar", "aprobar.pendientes": "{n} pendientes",
-  "aprobar.cierre": "La semana cierra el miércoles a las 11:59 p.m. Lo que no apruebes lo puede aprobar el admin, pero queda marcado.",
+  "aprobar.cierre": "Los turnos que terminan antes de las 5 p.m. se aprueban solos: aquí solo ves los que pasan de las 5 p.m. o se marcaron fuera del área. La semana cierra el miércoles a las 11:59 p.m. Lo que no apruebes lo puede aprobar el admin, pero queda marcado.",
   "aprobar.vacio": "Todo al día. No hay turnos por aprobar.", "aprobar.todo": "Aprobar los {n} que no tienen alertas",
   "aprobar.en_turno": "Trabajando ahora ({n})",
 
@@ -441,7 +441,7 @@ const en = {
   "reloj.gps_nota": "Your location is used when you clock in or out",
   "reloj.cambiar_nota": "To switch projects: clock out, then clock in on the other one.",
   "reloj.semana": "This week", "reloj.extra": "Overtime (after 5 p.m.)", "reloj.ganado": "Earned so far",
-  "reloj.estimado": "Estimate before deductions. Confirmed when your supervisor approves your hours.",
+  "reloj.estimado": "Estimate before deductions. Shifts that end by 5 p.m. are approved automatically; anything past 5 p.m. is confirmed when your supervisor approves it.",
   "reloj.sin_proyectos": "You have no projects assigned. Talk to your supervisor.",
   "reloj.confirmar_salida_t": "Clock out?", "reloj.confirmar_salida": "You are about to end your shift at {proyecto}.",
   "reloj.entrada_ok": "Clocked in", "reloj.salida_ok": "Clocked out",
@@ -468,7 +468,7 @@ const en = {
   "turno.corregido_ok": "Shift fixed and approved", "turno.aprobado_ok": "Shift approved", "turno.aprobados_n": "{n} shifts approved",
 
   "aprobar.titulo": "To approve", "aprobar.pendientes": "{n} pending",
-  "aprobar.cierre": "The week closes Wednesday at 11:59 p.m. Anything you don't approve can be approved by the admin, but it gets flagged.",
+  "aprobar.cierre": "Shifts that end before 5 p.m. are approved automatically: you only see the ones that run past 5 p.m. or were clocked outside the area. The week closes Wednesday at 11:59 p.m. Anything you don't approve can be approved by the admin, but it gets flagged.",
   "aprobar.vacio": "All caught up. Nothing to approve.", "aprobar.todo": "Approve the {n} without alerts",
   "aprobar.en_turno": "Working now ({n})",
 
@@ -835,7 +835,7 @@ const ht = {
   "reloj.gps_nota": "Yo itilize kote ou ye lè w ap make",
   "reloj.cambiar_nota": "Pou chanje pwojè: make sòti, epi antre nan lòt la.",
   "reloj.semana": "Semèn sa a", "reloj.extra": "Siplemantè (apre 5 p.m.)", "reloj.ganado": "Sa ou fè deja",
-  "reloj.estimado": "Estimasyon anvan dediksyon. Li konfime lè sipèvizè a apwouve èdtan ou.",
+  "reloj.estimado": "Estimasyon anvan dediksyon. Vire ki fini anvan 5 p.m. apwouve poukont yo; sa ki pase 5 p.m. konfime lè sipèvizè a apwouve l.",
   "reloj.sin_proyectos": "Ou pa gen pwojè. Pale ak sipèvizè ou.",
   "reloj.confirmar_salida_t": "Make sòti?", "reloj.confirmar_salida": "W ap fèmen vire ou nan {proyecto}.",
   "reloj.entrada_ok": "Antre make", "reloj.salida_ok": "Sòti make",
@@ -862,7 +862,7 @@ const ht = {
   "turno.corregido_ok": "Vire korije epi apwouve", "turno.aprobado_ok": "Vire apwouve", "turno.aprobados_n": "{n} vire apwouve",
 
   "aprobar.titulo": "Pou apwouve", "aprobar.pendientes": "{n} ap tann",
-  "aprobar.cierre": "Semèn nan fèmen mèkredi a 11:59 p.m. Sa ou pa apwouve, admin ka apwouve l, men l ap make.",
+  "aprobar.cierre": "Vire ki fini anvan 5 p.m. apwouve poukont yo: isit la ou wè sèlman sa ki pase 5 p.m. oswa ki make deyò zòn nan. Semèn nan fèmen mèkredi a 11:59 p.m. Sa ou pa apwouve, admin ka apwouve l, men l ap make.",
   "aprobar.vacio": "Tout bagay ajou. Pa gen anyen pou apwouve.", "aprobar.todo": "Apwouve {n} ki pa gen alèt yo",
   "aprobar.en_turno": "Ap travay kounye a ({n})",
 

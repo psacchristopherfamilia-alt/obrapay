@@ -122,6 +122,7 @@ function simulador(quien, llamadas) {
   const RPC = {
     semana_actual: () => id("s2"),
     mis_empresas: () => MIS_EMPRESAS,
+    mis_ajustes_empresas: () => MIS_EMPRESAS.map((e) => ({ empresa_id: e.id, zona_horaria: EMP.zona_horaria, hora_extra_desde: "17:00", almuerzo_inicio: "12:00", almuerzo_fin: "13:00", gps_activo: false, gps_modo: "marcar" })),
     elegir_empresa: () => null,
     mi_pago: () => [
       { empresa_id: EMP2.id, empresa: EMP2.nombre, semana_id: id("t1"), estado_semana: "cerrada", minutos_reg: 240, minutos_extra: 0, tarifa: 18, bruto: 72, seguro: 6.12, prestamo: 10, neto: 55.88, proyectos: [{ proyecto: "Torre Sur", minutos: 240, bruto: 72 }] },
@@ -191,7 +192,7 @@ function simulador(quien, llamadas) {
     turnos: () => TURNOS.filter((x) => quien.roles.some((r) => ["admin", "dueno"].includes(r)) || x.perfil_id === quien.id || (quien.roles.includes("supervisor") && x.proyecto_id === id("f1"))),
     tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => (quien.roles.includes("admin") ? AVISOS_ADMIN : AVISOS),
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
-    proyecto_trabajadores: () => [{ proyecto_id: id("f1"), perfil_id: P.juan.id, proyectos: PROY[0] }, { proyecto_id: id("f2"), perfil_id: P.juan.id, proyectos: PROY[1] }, { proyecto_id: id("f2"), perfil_id: P.marie.id, proyectos: PROY[1] }, { proyecto_id: id("f1"), perfil_id: P.pedro.id, proyectos: PROY[0] }],
+    proyecto_trabajadores: () => [{ proyecto_id: id("f1"), perfil_id: P.juan.id, proyectos: PROY[0] }, { proyecto_id: id("f2"), perfil_id: P.juan.id, proyectos: PROY[1] }, { proyecto_id: id("f9"), perfil_id: P.juan.id, proyectos: { id: id("f9"), empresa_id: EMP2.id, nombre: "Torre Sur", activo: true } }, { proyecto_id: id("f2"), perfil_id: P.marie.id, proyectos: PROY[1] }, { proyecto_id: id("f1"), perfil_id: P.pedro.id, proyectos: PROY[0] }],
     tasas_estatutarias: () => [
       { agencia: "NIB", tasa_empleado: 5.5, tasa_empleador: 6.5, tope_mensual: 6000, dia_vencimiento: 15, vigente_desde: "2026-01-01" },
       { agencia: "NHIP", tasa_empleado: 3, tasa_empleador: 3, tope_mensual: 7800, dia_vencimiento: 14, vigente_desde: "2026-01-01" }],
@@ -504,6 +505,18 @@ await flujo("trabajador en dos compañías ve un pago por compañía", P.juan, 3
   const txt = await pg.innerText("#vista");
   esperar(txt.includes("$92.48"), "no suma el neto de las dos compañías");
   esperar(txt.includes("Current Ltd") && txt.includes("$55.88") && txt.includes("$36.60"), "falta el bloque de cada compañía");
+});
+
+await flujo("trabajador con dos compañías marca en cualquiera sin cambiar de compañía", P.juan, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/reloj`);
+  await pg.waitForSelector(".lista-proyectos");
+  esperar((await pg.locator("#empresa-app").count()) === 0, "el trabajador ve el selector de compañía");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("Torre Sur") && txt.includes("Current Ltd") && txt.includes("Villa Grace Bay"), "el Reloj no muestra los proyectos de las dos compañías");
+  await pg.click(`input[name=proyecto][value="${id("f9")}"]`, { force: true });
+  await pg.click("#marcar");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/marcar_entrada") && x.cuerpo.p_proyecto === id("f9")), "no marcó entrada en el proyecto de la otra compañía");
 });
 
 await flujo("elegir compañía activa", P.admin, 1360, async (pg, ll) => {

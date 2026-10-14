@@ -16,7 +16,7 @@ import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
-export const ctx = { perfil: null, empresa: null, empresas: [], roles: [] };
+export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [] };
 
 // Rutas: [ruta, clave de texto, roles que la ven, función de la vista, solo con varias compañías]
 const RUTAS = [
@@ -47,16 +47,18 @@ function limpiar() { limpiezas.forEach((f) => { try { f(); } catch { /* nada */ 
 
 async function cargarContexto() {
   const yo = api.sesion().user_id;
-  const [perfiles, empresas, misEmpresas] = await Promise.all([
+  const [perfiles, empresas, misEmpresas, ajustes] = await Promise.all([
     api.sel("perfiles", `select=id,empresa_id,usuario,nombre,oficio,roles,idioma,activo,debe_cambiar_clave&id=eq.${yo}`),
     api.sel("empresas", "select=*"),
     api.rpc("mis_empresas"),
+    api.rpc("mis_ajustes_empresas"),
   ]);
   const perfil = perfiles[0];
   if (!perfil || !perfil.activo) throw new Error(t("err.inactivo"));
   ctx.perfil = perfil;
   ctx.empresa = empresas[0];
   ctx.empresas = misEmpresas || [];
+  ctx.ajustes = Object.fromEntries((ajustes || []).map((x) => [x.empresa_id, x]));
   ctx.roles = perfil.roles || [];
   fijarIdioma(perfil.idioma);
   fijarZona(ctx.empresa.zona_horaria);
@@ -70,8 +72,10 @@ function selectorIdioma(id) {
 }
 
 // Con más de una compañía, quien tiene acceso elige con cuál trabaja; se guarda en el servidor.
+// Quien solo es trabajador no elige compañía: el Reloj y sus horas muestran todos sus proyectos y cada turno cuenta en la compañía de su proyecto.
+const soloTrabajador = () => ctx.roles.every((r) => r === "trabajador");
 function selectorEmpresa() {
-  if (ctx.empresas.length < 2) return "";
+  if (ctx.empresas.length < 2 || soloTrabajador()) return "";
   return html`<label class="idioma"><span class="oculto">${t("emp.compania")}</span>
     <select id="empresa-app" aria-label="${t("emp.compania")}">
       ${ctx.empresas.map((e) => html`<option value="${e.id}" ${e.id === ctx.empresa.id ? html`selected` : ""}>${e.nombre}</option>`)}
