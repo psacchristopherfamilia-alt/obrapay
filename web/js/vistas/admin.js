@@ -328,7 +328,7 @@ export async function vistaTrabajadores(el, ctx) {
               <td><div class="acciones-fila">
                 ${marca ? html`<button type="button" class="btn btn-sec btn-chico" data-tarifa="${p.id}">${t("trab.tarifa")}</button>` : ""}
                 ${p.id !== ctx.perfil.id ? html`<button type="button" class="btn btn-sec btn-chico" data-editar="${p.id}">${t("trab.editar")}</button>` : ""}
-                ${otras.length && p.id !== ctx.perfil.id ? html`<button type="button" class="btn btn-sec btn-chico" data-compartir="${p.id}">${t("trab.compartir")}</button>
+                ${otras.length && p.id !== ctx.perfil.id && ctx.roles.includes("admin") ? html`<button type="button" class="btn btn-sec btn-chico" data-compartir="${p.id}">${t("trab.compartir")}</button>
                   <button type="button" class="btn btn-sec btn-chico" data-quitar-cia="${p.id}">${t("trab.quitar_cia")}</button>` : ""}
               </div></td></tr>`;
           })}</tbody>
