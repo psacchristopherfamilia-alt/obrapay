@@ -348,7 +348,21 @@ select public.quitar_de_empresa(pg_temp.id('c5'));
 reset role;
 select test.ok(not public.es_miembro(pg_temp.id('c5'), pg_temp.id('e2')), 'Pedro ya no es de la compañía dos');
 select test.ok(public.es_miembro(pg_temp.id('c5'), pg_temp.id('e1')), 'Pedro sigue en la uno');
-select test.igual((select count(*)::int from public.proyecto_trabajadores where perfil_id = pg_temp.id('c5') and empresa_id = pg_temp.id('e2')), 0, 'sus asignaciones de la dos se quitaron');
+select test.ok(exists (select 1 from public.perfil_empresas where perfil_id = pg_temp.id('c5') and empresa_id = pg_temp.id('e2') and baja_en is not null), 'la baja queda marcada, la fila se conserva');
+set role authenticated;
+select test.como(pg_temp.id('c5'));
+select test.igual((select count(*)::int from public.proyecto_trabajadores where perfil_id = pg_temp.id('c5') and empresa_id = pg_temp.id('e2')), 0, 'sus asignaciones de la dos ya no se ven');
+select test.igual((select count(*)::int from public.mis_empresas()), 1, 'ya solo ve la compañía uno');
+select test.como(pg_temp.id('a1'));
+select pg_temp.en('e1');
+select public.compartir_trabajador(pg_temp.id('c5'), pg_temp.id('e2'), 20);
+reset role;
+select test.ok(public.es_miembro(pg_temp.id('c5'), pg_temp.id('e2')), 'al compartirlo de nuevo se reactiva');
+set role authenticated;
+select test.como(pg_temp.id('a1'));
+select pg_temp.en('e2');
+select public.quitar_de_empresa(pg_temp.id('c5'));
+reset role;
 select test.igual((select empresa_id from public.perfiles where id = pg_temp.id('c5')), pg_temp.id('e1'), 'su compañía de inicio sigue siendo la uno');
 
 -- ---------------------------------------------------------------------------
