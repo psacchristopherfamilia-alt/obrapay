@@ -381,4 +381,25 @@ select test.igual((select count(*)::int from public.notificaciones where perfil_
 select test.igual((select count(*)::int from public.notificaciones where perfil_id = pg_temp.id('a1') and tipo = 'semana_por_cerrar'), 2, 'admin de las dos: 1 aviso por compañía');
 select test.igual((select count(*)::int from public.notificaciones where perfil_id = pg_temp.id('d1') and tipo = 'semana_por_cerrar'), 0, 'el dueño no recibe avisos de admin');
 
+-- ---------------------------------------------------------------------------
+-- Trabajadores nuevos: habilitados solos en las compañías hermanas
+-- ---------------------------------------------------------------------------
+insert into auth.users (id, email) values (pg_temp.id('c9'), 'nuevo9@obrapay.local'), (pg_temp.id('b9'), 'sup9@obrapay.local');
+insert into public.perfiles (id, empresa_id, usuario, nombre, roles)
+values (pg_temp.id('c9'), pg_temp.id('e1'), 'nuevo9', 'Trabajador nuevo', array['trabajador']),
+       (pg_temp.id('b9'), pg_temp.id('e1'), 'sup9', 'Supervisor nuevo', array['supervisor']);
+select test.ok(public.es_miembro(pg_temp.id('c9'), pg_temp.id('e2')), 'trabajador nuevo: queda habilitado en la otra compañía sin compartir');
+select test.ok(not public.es_miembro(pg_temp.id('b9'), pg_temp.id('e2')), 'supervisor nuevo: solo ve su compañía');
+select test.ok(not public.es_miembro(pg_temp.id('a3'), pg_temp.id('e2')), 'admin de una sola compañía: no se amplía');
+insert into public.tarifas (empresa_id, perfil_id, monto_hora, vigente_desde) values (pg_temp.id('e1'), pg_temp.id('c9'), 14.50, '2027-01-01');
+select test.igual((select monto_hora from public.tarifas where perfil_id = pg_temp.id('c9') and empresa_id = pg_temp.id('e2')), 14.50, 'su tarifa se copia a la otra compañía');
+update public.tarifas set monto_hora = 16 where perfil_id = pg_temp.id('c9') and empresa_id = pg_temp.id('e1');
+select test.igual((select monto_hora from public.tarifas where perfil_id = pg_temp.id('c9') and empresa_id = pg_temp.id('e2')), 14.50, 'después las tarifas son independientes');
+set role authenticated;
+select test.como(pg_temp.id('a1'));
+select pg_temp.en('e2');
+insert into public.proyecto_trabajadores (empresa_id, proyecto_id, perfil_id) values (pg_temp.id('e2'), pg_temp.id('f4'), pg_temp.id('c9'));
+reset role;
+select test.ok(exists (select 1 from public.proyecto_trabajadores where perfil_id = pg_temp.id('c9') and empresa_id = pg_temp.id('e2')), 'se le puede asignar a un proyecto de la otra compañía');
+
 rollback;
