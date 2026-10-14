@@ -102,8 +102,15 @@ select test.falla($$select public.cambiar_tasa_estatutaria('NIB', '2027-02-01', 
 select test.falla($$select public.cambiar_tasa_estatutaria('NIB', '2027-02-01', 1, 1, 0, 10)$$, 'tope mensual', 'tope debe ser positivo');
 select test.falla($$select public.cambiar_tasa_estatutaria('NIB', '2027-02-01', 1, 1, 100, 31)$$, 'día de vencimiento', 'día de vencimiento 1 a 28');
 
+-- Salario mínimo editable solo por el admin
+select test.falla($$select public.cambiar_salario_minimo(0)$$, 'mayor que cero', 'el mínimo debe ser positivo');
+select public.cambiar_salario_minimo(10.50);
+select test.igual((select salario_minimo_hora from public.empresas where id = '00000000-0000-0000-0000-0000000000e1'), 10.50::numeric, 'el admin cambia el salario mínimo');
+select test.falla($$select public.cambiar_tarifa(pg_temp.yo('c4'), 10.00, '2027-04-01')$$, 'salario mínimo', 'la tarifa respeta el mínimo nuevo');
+
 -- Permisos
 select test.como(pg_temp.yo('d1'));
+select test.falla($$select public.cambiar_salario_minimo(12)$$, 'No tienes permiso', 'el dueño no cambia el salario mínimo');
 select test.falla($$select public.cambiar_tasa_estatutaria('NIB', '2027-03-01', 1, 1, 100, 10)$$, 'No tienes permiso', 'el dueño no cambia tasas');
 select test.falla($$select public.actualizar_datos_estatutarios(pg_temp.yo('c4'), 'x', 'y', null)$$, 'No tienes permiso', 'el dueño no edita datos estatutarios');
 select test.como(pg_temp.yo('c1'));

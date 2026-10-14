@@ -86,7 +86,8 @@ export async function vistaSeguros(el, ctx) {
       <section class="tarjeta"><h2>${t("seg.minimo")}</h2>
         <p class="nota">${minimo ? t("seg.minimo_valor", { minimo: dinero(minimo) }) : ""}</p>
         ${bajos.length ? html`<ul class="historial">${bajos.map((b) => html`<li><span>${b.nombre}</span><span class="mono rojo">${dinero(b.tarifa)}/h</span></li>`)}</ul>`
-          : html`<p class="vacio">${t("seg.minimo_vacia")}</p>`}</section>
+          : html`<p class="vacio">${t("seg.minimo_vacia")}</p>`}
+        ${esAdmin ? html`<button type="button" class="btn btn-sec btn-chico" id="editar-minimo">${t("seg.minimo_hora")}</button>` : ""}</section>
 
       <section class="tarjeta"><h2>${t("seg.tasas")}</h2>
         <div class="tabla-caja" tabindex="0" role="region" aria-label="${t("seg.tasas")}"><table class="tabla">
@@ -167,6 +168,28 @@ export async function vistaSeguros(el, ctx) {
     });
   };
 
+  const modalMinimo = () => {
+    const d = abrirModal(t("seg.minimo_hora"), html`
+      <form class="form" novalidate>
+        <div class="campo"><label for="m-min">${t("seg.minimo_hora")}</label><input id="m-min" name="min" type="number" step="0.01" min="0.01" required value="${ctx.empresa.salario_minimo_hora ?? ""}" inputmode="decimal"></div>
+        <p class="error-form" role="alert" hidden></p>
+        <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
+          <button type="submit" class="btn btn-pri">${t("comun.guardar")}</button></div>
+      </form>`);
+    const f = d.querySelector("form");
+    f.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const err = f.querySelector(".error-form");
+      const v = Number(f.min.value);
+      if (!f.min.value || Number.isNaN(v) || v <= 0) { err.hidden = false; err.textContent = t("seg.valor_invalido"); return; }
+      try {
+        await ocupado(f.querySelector("[type=submit]"), () => api.rpc("cambiar_salario_minimo", { p_monto: v }));
+        ctx.empresa.salario_minimo_hora = v;
+        cerrarModal(); aviso(t("comun.guardado")); await cargar();
+      } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
+    });
+  };
+
   el.addEventListener("change", (ev) => {
     if (ev.target.id === "mes") mes = Number(ev.target.value);
     if (ev.target.id === "anio") anio = Number(ev.target.value);
@@ -177,6 +200,7 @@ export async function vistaSeguros(el, ctx) {
     if (!b) return;
     if (b.dataset.tasa) modalTasa(b.dataset.tasa);
     if (b.dataset.datos) modalDatos(b.dataset.datos);
+    if (b.id === "editar-minimo") modalMinimo();
     if (b.id === "excel") {
       const res = resumen();
       descargar(crearXlsx([

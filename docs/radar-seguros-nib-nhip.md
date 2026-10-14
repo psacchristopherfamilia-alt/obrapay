@@ -83,4 +83,4 @@ Implementado (migración `20261013000006_nib_nhip.sql`, ya aplicada en producci�
   vencimiento (`avisar_remesas`) y tarifa mínima de construcción ($9/h por defecto) validada al cambiar tarifas.
 - Pantalla **Seguros (NIB/NHIP)** en la app (`web/js/vistas/seguros.js`) y pruebas en `tests/db/40_nib_nhip.sql`.
 - Pendiente: confirmar tasas, topes y fechas con el NIB o un contador (las de partida vienen de una sola fuente y las
-  fuentes no coinciden); decidir si el salario mínimo por hora debe poder editarse desde la app (hoy es solo lectura).
+  fuentes no coinciden).

@@ -396,6 +396,15 @@ await flujo("admin cambia tasa NHIP, guarda datos de seguro y exporta la remesa"
   esperar(/^remesa_\d{4}-\d{2}\.xlsx$/.test(descarga.suggestedFilename()), `nombre inesperado ${descarga.suggestedFilename()}`);
 });
 
+await flujo("admin cambia el salario mínimo", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/seguros`);
+  await pg.click("#editar-minimo");
+  await pg.fill("#m-min", "9.50");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/cambiar_salario_minimo") && x.cuerpo.p_monto === 9.5), "no cambió el mínimo");
+});
+
 await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/seguros`);
   await pg.waitForSelector("[data-tasa=NIB]");
