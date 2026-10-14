@@ -308,3 +308,7 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 @media print { .nav-lista, .lateral-pie, .tabs, .cab-acciones, .acciones, .ciclo { display: none !important; } body { background: #fff; } .escritorio { padding: 0; } }
+
+.avisos-admin { display: grid; gap: 8px; margin-bottom: 16px; }
+.avisos-admin a { color: inherit; text-decoration: none; }
+.avisos-admin a:hover { text-decoration: underline; }

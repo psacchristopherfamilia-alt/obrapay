@@ -81,6 +81,7 @@ Implementado (migración `20261013000006_nib_nhip.sql`, ya aplicada en producci�
 - Reporte de remesa mensual por trabajador (`reporte_remesa`), permisos sin número NHIP (`pendientes_registro_nhip`),
   números NIB/NHIP y fecha de permiso en el perfil (`actualizar_datos_estatutarios`), aviso 3 días antes del
   vencimiento (`avisar_remesas`) y tarifa mínima de construcción ($9/h por defecto) validada al cambiar tarifas.
+- Avisos al admin dentro de la app (migraciones `20261014000009` y `...10`): remesa NIB/NHIP 3 días antes y el día del vencimiento, semana por cerrar (miércoles), turnos sin aprobar con más de un día y trabajador que cruza el tope de NIB/NHIP. Corren cada día a las 13:00 UTC. Aún no hay WhatsApp ni correo: faltan cuenta de envío y números del admin.
 - Pantalla **Seguros (NIB/NHIP)** en la app (`web/js/vistas/seguros.js`) y pruebas en `tests/db/40_nib_nhip.sql`.
 - Pendiente: confirmar tasas, topes y fechas con el NIB o un contador (las de partida vienen de una sola fuente y las
   fuentes no coinciden).

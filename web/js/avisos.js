@@ -1,0 +1,49 @@
+// Avisos del admin dentro de la app: remesas por vencer, semana por cerrar, turnos sin aprobar y topes de seguro.
+// Los crea la base de datos cada día (avisar_remesas / avisar_pendientes); aquí solo se leen y se marcan como leídos.
+import { api } from "./api.js";
+import { t } from "./i18n.js";
+import { html, esc, crudo, dinero, fmtDia, ICONO } from "./ui.js";
+
+const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro"];
+const fecha = (d) => fmtDia(d, { day: "numeric", month: "short" });
+
+function texto(a) {
+  const d = a.datos || {};
+  switch (a.tipo) {
+    case "remesa_por_vencer":
+      return [Number(d.dias) === 0 ? t("aviso.remesa_hoy", { agencia: d.agencia, total: dinero(d.total) })
+        : t("aviso.remesa_pronto", { agencia: d.agencia, fecha: fecha(d.vence), total: dinero(d.total) }), "seguros"];
+    case "semana_por_cerrar": return [t("aviso.semana_cierre", { inicio: fecha(d.inicio), fin: fecha(d.fin) }), "nomina"];
+    case "turnos_sin_aprobar": return [t("aviso.turnos_sin_aprobar", { n: d.n }), "turnos"];
+    case "tope_seguro": return [t("aviso.tope_seguro", { nombre: esc(d.nombre), agencia: d.agencia }), "seguros"];
+    default: return null;
+  }
+}
+
+export async function pintarAvisos(el, ctx) {
+  if (!ctx.roles.includes("admin")) return;
+  let lista = [];
+  try {
+    lista = await api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${ctx.perfil.id}&leida=eq.false&order=creado_en.desc&limit=12`);
+  } catch { return; }
+  lista = lista.filter((a) => TIPOS.includes(a.tipo));
+  if (!lista.length) return;
+  const caja = document.createElement("div");
+  caja.className = "avisos-admin";
+  caja.setAttribute("role", "region");
+  caja.setAttribute("aria-label", t("aviso.titulo"));
+  caja.innerHTML = String(html`${lista.map((a) => { const x = texto(a); return html`<div class="banner banner-aviso" role="status" data-aviso="${a.id}">
+    ${crudo(ICONO.arriba)}<span><a href="#/${x[1]}">${crudo(x[0])}</a></span>
+    <button type="button" class="btn-texto" data-leido="${a.id}">${t("comun.entendido")}</button></div>`; })}`);
+  el.prepend(caja);
+  caja.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("[data-leido]");
+    if (!b) return;
+    b.disabled = true;
+    try {
+      await api.actualizar("notificaciones", `id=eq.${b.dataset.leido}`, { leida: true });
+      b.closest("[data-aviso]").remove();
+      if (!caja.children.length) caja.remove();
+    } catch { b.disabled = false; }
+  });
+}

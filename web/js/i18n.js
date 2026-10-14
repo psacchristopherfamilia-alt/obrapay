@@ -200,6 +200,12 @@ const es = {
   "seg.nib_num": "Número NIB",
   "seg.nhip_num": "Número NHIP",
   "seg.valor_invalido": "Revisa los valores.",
+  "aviso.titulo": "Avisos",
+  "aviso.remesa_hoy": "<strong>{agencia} vence hoy.</strong> Remesa del mes pasado: {total}.",
+  "aviso.remesa_pronto": "<strong>{agencia} vence el {fecha}.</strong> Remesa del mes pasado: {total}.",
+  "aviso.semana_cierre": "<strong>La semana cierra hoy</strong> ({inicio} – {fin}). Aprueba los turnos pendientes antes de las 11:59 p.m.",
+  "aviso.turnos_sin_aprobar": "<strong>{n} turnos sin aprobar</strong> con más de un día.",
+  "aviso.tope_seguro": "<strong>{nombre}</strong> llegó al tope mensual de {agencia}.",
 };
 
 const en = {
@@ -400,6 +406,12 @@ const en = {
   "seg.nib_num": "NIB number",
   "seg.nhip_num": "NHIP number",
   "seg.valor_invalido": "Check the values.",
+  "aviso.titulo": "Notices",
+  "aviso.remesa_hoy": "<strong>{agencia} is due today.</strong> Last month's remittance: {total}.",
+  "aviso.remesa_pronto": "<strong>{agencia} is due {fecha}.</strong> Last month's remittance: {total}.",
+  "aviso.semana_cierre": "<strong>The week closes today</strong> ({inicio} – {fin}). Approve pending shifts before 11:59 p.m.",
+  "aviso.turnos_sin_aprobar": "<strong>{n} shifts not approved</strong> for over a day.",
+  "aviso.tope_seguro": "<strong>{nombre}</strong> reached the monthly {agencia} cap.",
 };
 
 const ht = {
@@ -600,6 +612,12 @@ const ht = {
   "seg.nib_num": "Nimewo NIB",
   "seg.nhip_num": "Nimewo NHIP",
   "seg.valor_invalido": "Verifye valè yo.",
+  "aviso.titulo": "Avi",
+  "aviso.remesa_hoy": "<strong>{agencia} dwe jodi a.</strong> Remèt mwa pase a: {total}.",
+  "aviso.remesa_pronto": "<strong>{agencia} dwe {fecha}.</strong> Remèt mwa pase a: {total}.",
+  "aviso.semana_cierre": "<strong>Semèn nan fèmen jodi a</strong> ({inicio} – {fin}). Apwouve vire ki ap tann yo anvan 11:59 p.m.",
+  "aviso.turnos_sin_aprobar": "<strong>{n} vire pa apwouve</strong> depi plis pase yon jou.",
+  "aviso.tope_seguro": "<strong>{nombre}</strong> rive nan plafon mensyèl {agencia}.",
 };
 
 export const TEXTOS = { es, en, ht };

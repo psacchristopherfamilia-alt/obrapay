@@ -49,7 +49,7 @@ export async function vistaReloj(el, ctx) {
     api.sel("proyecto_trabajadores", `select=proyecto_id,proyectos(id,nombre,activo)&perfil_id=eq.${yo}`),
     api.sel("turnos", `select=id,proyecto_id,entrada,salida,estado,proyectos(nombre)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
     api.sel("tarifas", `select=monto_hora,vigente_desde&perfil_id=eq.${yo}`),
-    api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${yo}&leida=eq.false&order=creado_en.desc`),
+    api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${yo}&leida=eq.false&tipo=eq.cambio_tarifa&order=creado_en.desc`),
   ]);
   // Un turno abierto de una semana anterior también cuenta.
   const abiertos = await api.sel("turnos", `select=id,proyecto_id,entrada,proyectos(nombre)&perfil_id=eq.${yo}&salida=is.null`);

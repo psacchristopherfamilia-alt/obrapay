@@ -93,6 +93,12 @@ const NOMINA_PROY = {
 };
 const PRESTAMOS = [{ id: id("l1"), empresa_id: EMP.id, perfil_id: P.juan.id, monto_total: 600, fecha: "2026-09-03", nota: null, activo: true, perfiles: { nombre: "Juan Pérez" } }];
 const DESCUENTOS = [{ prestamo_id: id("l1"), semana_id: id("s1"), monto: 50 }, { prestamo_id: id("l1"), semana_id: id("s0"), monto: 200 }];
+const AVISOS_ADMIN = [
+  { id: id("na1"), perfil_id: P.admin.id, tipo: "remesa_por_vencer", datos: { agencia: "NHIP", vence: "2026-11-14", mes: "2026-10", total: 1006, dias: 3 }, leida: false, creado_en: "2026-11-11T13:00:00Z" },
+  { id: id("na2"), perfil_id: P.admin.id, tipo: "semana_por_cerrar", datos: { inicio: "2026-10-08", fin: "2026-10-14" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
+  { id: id("na3"), perfil_id: P.admin.id, tipo: "turnos_sin_aprobar", datos: { n: 3 }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
+  { id: id("na4"), perfil_id: P.admin.id, tipo: "tope_seguro", datos: { agencia: "NIB", nombre: "Juan <b>Pérez</b>" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
+];
 const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", datos: { antes: 17, despues: 18, desde: "2026-10-01" }, leida: false, creado_en: "2026-10-01T12:00:00Z" }];
 
 // ---------------------------------------------------------------------------
@@ -128,7 +134,7 @@ function simulador(quien, llamadas) {
     perfiles: () => (quien.roles.includes("admin") || quien.roles.includes("dueno") ? Object.values(P) : [quien, ...(quien.roles.includes("supervisor") ? [P.juan, P.pedro] : [])]),
     empresas: () => [EMP], proyectos: () => PROY, semanas: () => SEM,
     turnos: () => TURNOS.filter((x) => quien.roles.some((r) => ["admin", "dueno"].includes(r)) || x.perfil_id === quien.id || (quien.roles.includes("supervisor") && x.proyecto_id === id("f1"))),
-    tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => AVISOS,
+    tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => (quien.roles.includes("admin") ? AVISOS_ADMIN : AVISOS),
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
     proyecto_trabajadores: () => [{ proyecto_id: id("f1"), perfil_id: P.juan.id, proyectos: PROY[0] }, { proyecto_id: id("f2"), perfil_id: P.juan.id, proyectos: PROY[1] }, { proyecto_id: id("f2"), perfil_id: P.marie.id, proyectos: PROY[1] }, { proyecto_id: id("f1"), perfil_id: P.pedro.id, proyectos: PROY[0] }],
     tasas_estatutarias: () => [
@@ -403,6 +409,18 @@ await flujo("admin cambia el salario mínimo", P.admin, 1360, async (pg, ll) => 
   await pg.click("dialog button[type=submit]");
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.ruta.endsWith("/cambiar_salario_minimo") && x.cuerpo.p_monto === 9.5), "no cambió el mínimo");
+});
+
+await flujo("admin ve y descarta sus avisos", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/nomina`);
+  await pg.waitForSelector(".avisos-admin");
+  const txt = await pg.innerText(".avisos-admin");
+  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB"), "faltan avisos del admin");
+  esperar(!(await pg.innerHTML(".avisos-admin")).includes("<b>"), "el nombre del aviso no se escapó");
+  await pg.click(`[data-leido="${id("na3")}"]`);
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.metodo === "PATCH" && x.ruta.endsWith("/notificaciones")), "no marcó el aviso como leído");
+  esperar((await pg.locator("[data-aviso]").count()) === 3, "no quitó el aviso descartado");
 });
 
 await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {

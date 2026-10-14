@@ -10,6 +10,7 @@ import {
 } from "./vistas/admin.js";
 import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
+import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
 export const ctx = { perfil: null, empresa: null, roles: [] };
@@ -136,6 +137,7 @@ async function mostrar() {
   el.innerHTML = `<div class="esqueleto"><div></div><div></div><div></div></div>`;
   try {
     await vista(el, ctx);
+    await pintarAvisos(el, ctx);
   } catch (e) {
     if (!api.sesion()) return;
     el.innerHTML = String(html`<div class="error-vista" role="alert"><p>${mensajeError(e)}</p>

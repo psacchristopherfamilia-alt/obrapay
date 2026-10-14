@@ -137,6 +137,16 @@ reset role;
 select test.igual(public.avisar_remesas('2027-02-11 09:00-05'), 2, 'el 11 de febrero avisa del NHIP (una por empresa)');
 select test.igual(public.avisar_remesas('2027-02-12 09:00-05'), 2, 'el 12 de febrero avisa del NIB (una por empresa)');
 select test.igual(public.avisar_remesas('2027-02-13 09:00-05'), 0, 'otros días no avisa');
+select test.igual(public.avisar_remesas('2027-02-14 09:00-05'), 2, 'el mismo día del vencimiento NHIP vuelve a avisar');
+select test.igual(public.avisar_remesas('2027-02-15 09:00-05'), 2, 'el mismo día del vencimiento NIB vuelve a avisar');
 select test.ok(exists (select 1 from public.notificaciones where tipo = 'remesa_por_vencer' and perfil_id = pg_temp.yo('a1')), 'el admin recibe el aviso');
 
+-- Otros avisos al admin: semana por cerrar (miércoles 10 feb), turno sin aprobar y tope NHIP cruzado en la semana B
+update public.semanas set cerrada_en = '2027-02-09 22:00-05' where id = test.semana('2027-01-14');
+select test.turno('c1', 'f1', '2027-02-08', '07:00', '15:00', 'por_aprobar');
+select test.igual(public.avisar_pendientes('2027-02-10 09:00-05'), 3, 'semana por cerrar + turno sin aprobar + tope NHIP de Jean');
+select test.igual(public.avisar_pendientes('2027-02-10 09:30-05'), 0, 'sin duplicar avisos');
+select test.ok(exists (select 1 from public.notificaciones where tipo = 'tope_seguro' and datos ->> 'agencia' = 'NHIP' and datos ->> 'perfil' = pg_temp.yo('c4')::text), 'aviso de tope NHIP con el trabajador');
+select test.igual((select count(*)::int from public.notificaciones where tipo = 'semana_por_cerrar' and perfil_id = pg_temp.yo('a1')), 1, 'el admin recibe el aviso de cierre');
+select test.igual((select count(*)::int from public.notificaciones where tipo in ('semana_por_cerrar', 'turnos_sin_aprobar', 'tope_seguro') and perfil_id <> pg_temp.yo('a1')), 0, 'solo el admin recibe avisos');
 rollback;
