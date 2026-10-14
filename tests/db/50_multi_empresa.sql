@@ -402,4 +402,30 @@ insert into public.proyecto_trabajadores (empresa_id, proyecto_id, perfil_id) va
 reset role;
 select test.ok(exists (select 1 from public.proyecto_trabajadores where perfil_id = pg_temp.id('c9') and empresa_id = pg_temp.id('e2')), 'se le puede asignar a un proyecto de la otra compañía');
 
+-- ---------------------------------------------------------------------------
+-- Equipo por compañía (solo lectura)
+-- ---------------------------------------------------------------------------
+set role authenticated;
+select test.como(pg_temp.id('a1'));
+create temp table eq as select * from public.equipo_empresas();
+grant select on eq to authenticated;
+reset role;
+select test.igual((select trabajadores from eq where tipo = 'total' and empresa_id = pg_temp.id('e2')), 2, 'equipo: la compañía dos tiene 2 trabajadores con proyecto');
+select test.igual((select supervisores from eq where tipo = 'total' and empresa_id = pg_temp.id('e2')), 1, 'equipo: la compañía dos tiene 1 supervisor');
+select test.igual((select trabajadores from eq where tipo = 'proyecto' and proyecto_id = pg_temp.id('f4')), 2, 'equipo: el proyecto de la dos tiene 2 trabajadores');
+select test.igual((select trabajadores from eq where tipo = 'supervisor' and perfil_id = pg_temp.id('b2') and empresa_id = pg_temp.id('e2')), 2, 'equipo: A. Louis tiene 2 trabajadores a cargo en la dos');
+select test.igual((select proyectos from eq where tipo = 'supervisor' and perfil_id = pg_temp.id('b2') and empresa_id = pg_temp.id('e2')), 1, 'equipo: A. Louis supervisa 1 proyecto en la dos');
+select test.igual((select trabajadores from eq where tipo = 'supervisor' and perfil_id = pg_temp.id('b1') and empresa_id = pg_temp.id('e1')),
+  (select count(distinct t.perfil_id)::int from public.proyecto_trabajadores t join public.perfiles pe on pe.id = t.perfil_id and pe.activo
+    where t.empresa_id = pg_temp.id('e1') and t.proyecto_id in (select proyecto_id from public.proyecto_supervisores where perfil_id = pg_temp.id('b1') and empresa_id = pg_temp.id('e1'))
+      and exists (select 1 from public.proyectos pr where pr.id = t.proyecto_id and pr.activo)),
+  'equipo: trabajadores a cargo de Ramón');
+select test.igual((select count(*)::int from eq where tipo = 'total'), 2, 'equipo: una fila de totales por compañía');
+set role authenticated;
+select test.como(pg_temp.id('a3'));
+select test.igual((select count(*)::int from public.equipo_empresas() where tipo = 'total'), 1, 'equipo: un admin de una sola compañía solo ve la suya');
+select test.como(pg_temp.id('b1'));
+select test.falla($q$select * from public.equipo_empresas()$q$, 'No tienes permiso', 'equipo: un supervisor no ve el resumen');
+reset role;
+
 rollback;

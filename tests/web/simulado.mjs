@@ -132,6 +132,14 @@ function simulador(quien, llamadas) {
       { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: id("g1"), proyecto: "Torre Sur", concepto: "materiales", monto: 1250 },
       { empresa_id: EMP.id, empresa: EMP.nombre, proyecto_id: id("f1"), proyecto: "Villa Grace Bay", concepto: "mano_obra", monto: 6300 },
       { empresa_id: EMP.id, empresa: EMP.nombre, proyecto_id: null, proyecto: null, concepto: "poliza", monto: 900 }],
+    equipo_empresas: () => [
+      { empresa_id: EMP2.id, tipo: "total", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 3, supervisores: 1, proyectos: 1 },
+      { empresa_id: EMP2.id, tipo: "sin_asignar", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 2, supervisores: null, proyectos: null },
+      { empresa_id: EMP2.id, tipo: "proyecto", proyecto_id: id("g1"), perfil_id: null, nombre: "Torre Sur", trabajadores: 3, supervisores: 1, proyectos: null },
+      { empresa_id: EMP2.id, tipo: "supervisor", proyecto_id: null, perfil_id: id("b1"), nombre: "Ramón Gómez", trabajadores: 3, supervisores: null, proyectos: 1 },
+      { empresa_id: EMP.id, tipo: "total", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 1, supervisores: 0, proyectos: 1 },
+      { empresa_id: EMP.id, tipo: "sin_asignar", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 0, supervisores: null, proyectos: null },
+      { empresa_id: EMP.id, tipo: "proyecto", proyecto_id: id("f1"), perfil_id: null, nombre: "Villa Grace Bay", trabajadores: 1, supervisores: 0, proyectos: null }],
     nomina_semana: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA[a.p_semana] : NOMINA[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     nomina_semana_proyectos: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA_PROY[a.p_semana] : NOMINA_PROY[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     reporte_mensual: () => [{ perfil_id: P.juan.id, nombre: "Juan Pérez", semanas: 2, minutos_reg: 4800, minutos_extra: 400, bruto: 1600, seguro: 48, prestamo: 250, neto: 1302 }],
@@ -508,6 +516,7 @@ await flujo("dueño ve el resumen separado por compañía", P.dueno, 1360, async
   const txt = await pg.innerText("#vista");
   esperar(/current ltd/i.test(txt) && /mi empresa/i.test(txt), "no muestra las dos compañías");
   esperar(txt.includes("$5,770.00") && txt.includes("$7,200.00") && txt.includes("$12,970.00"), "totales por compañía incorrectos");
+  esperar(/equipo · current ltd/i.test(txt) && /ramón gómez/i.test(txt) && /trabajadores a cargo/i.test(txt), "no muestra el equipo por compañía");
 });
 
 await navegador.close();

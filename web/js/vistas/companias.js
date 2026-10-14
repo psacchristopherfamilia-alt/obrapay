@@ -156,7 +156,10 @@ export async function vistaCompanias(el, ctx) {
 
   const cargar = async () => {
     const { desde, hasta } = rangoMes(mes);
-    const filas = await api.rpc("resumen_empresas", { p_desde: desde, p_hasta: hasta });
+    const [filas, equipo] = await Promise.all([
+      api.rpc("resumen_empresas", { p_desde: desde, p_hasta: hasta }),
+      api.rpc("equipo_empresas", {}),
+    ]);
     const porEmpresa = ctx.empresas.map((e, i) => {
       const propias = filas.filter((f) => f.empresa_id === e.id);
       const proyectos = new Map();
@@ -169,7 +172,12 @@ export async function vistaCompanias(el, ctx) {
       });
       const lista = [...proyectos.values()].map((p) => ({ ...p, total: Object.values(p.val).reduce((a, b) => a + b, 0) }))
         .sort((a, b) => a.nombre.localeCompare(b.nombre));
-      return { ...e, i, lista, total: lista.reduce((a, p) => a + p.total, 0) };
+      const eq = equipo.filter((f) => f.empresa_id === e.id);
+      const tot = eq.find((f) => f.tipo === "total") || {};
+      const sinAsignar = (eq.find((f) => f.tipo === "sin_asignar") || {}).trabajadores || 0;
+      const porProyecto = eq.filter((f) => f.tipo === "proyecto").sort((a, b) => a.nombre.localeCompare(b.nombre));
+      const porSupervisor = eq.filter((f) => f.tipo === "supervisor").sort((a, b) => a.nombre.localeCompare(b.nombre));
+      return { ...e, i, lista, total: lista.reduce((a, p) => a + p.total, 0), tot, sinAsignar, porProyecto, porSupervisor };
     });
     const suma = porEmpresa.reduce((a, e) => a + e.total, 0);
     el.innerHTML = String(html`
@@ -200,8 +208,27 @@ export async function vistaCompanias(el, ctx) {
                 <th scope="row">${p.nombre}</th>
                 ${COLUMNAS.map(([c]) => html`<td class="num mono">${p.val[c] ? dinero(p.val[c]) : "—"}</td>`)}
                 <td class="num mono fuerte">${dinero(p.total)}</td></tr>`)}</tbody></table></div>` : html`<div class="vacio">${t("comp.vacio")}</div>`}
+        </section>
+        <section class="seccion">
+          <h2>${t("comp.equipo", { empresa: e.nombre })}</h2>
+          <div class="kpis">
+            <div class="kpi"><div class="sub">${t("comp.eq_trabajadores")}</div><div class="num">${e.tot.trabajadores || 0}</div></div>
+            <div class="kpi"><div class="sub">${t("comp.eq_supervisores")}</div><div class="num">${e.tot.supervisores || 0}</div></div>
+            <div class="kpi"><div class="sub">${t("comp.eq_proyectos")}</div><div class="num">${e.tot.proyectos || 0}</div></div>
+            <div class="kpi"><div class="sub">${t("comp.eq_sin_asignar")}</div><div class="num">${e.sinAsignar}</div></div>
+          </div>
+          ${e.porProyecto.length ? html`<div class="tabla-caja" role="region" aria-label="${t("comp.eq_col_proyecto")} · ${e.nombre}" tabindex="0">
+            <table class="tabla"><thead><tr><th scope="col">${t("comp.eq_col_proyecto")}</th>
+              <th scope="col" class="num">${t("comp.eq_col_trab")}</th><th scope="col" class="num">${t("comp.eq_col_sup")}</th></tr></thead>
+              <tbody>${e.porProyecto.map((p) => html`<tr><th scope="row">${p.nombre}</th>
+                <td class="num mono">${p.trabajadores}</td><td class="num mono">${p.supervisores}</td></tr>`)}</tbody></table></div>` : ""}
+          ${e.porSupervisor.length ? html`<div class="tabla-caja" role="region" aria-label="${t("comp.eq_col_supervisor")} · ${e.nombre}" tabindex="0">
+            <table class="tabla"><thead><tr><th scope="col">${t("comp.eq_col_supervisor")}</th>
+              <th scope="col" class="num">${t("comp.eq_col_proys")}</th><th scope="col" class="num">${t("comp.eq_col_acargo")}</th></tr></thead>
+              <tbody>${e.porSupervisor.map((p) => html`<tr><th scope="row">${p.nombre}</th>
+                <td class="num mono">${p.proyectos}</td><td class="num mono">${p.trabajadores}</td></tr>`)}</tbody></table></div>` : html`<div class="vacio">${t("comp.eq_sin_sup")}</div>`}
         </section>`)}
-      <p class="nota">${t("comp.nota")}</p>`);
+      <p class="nota">${t("comp.nota")} ${t("comp.eq_nota")}</p>`);
     el.querySelector("#mes").addEventListener("change", (ev) => {
       mes = meses.find((x) => x.clave === ev.target.value);
       cargar().catch((e) => aviso(mensajeError(e), "error"));
