@@ -11,6 +11,7 @@ import {
 import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
+import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
@@ -29,6 +30,7 @@ const RUTAS = [
   ["proyectos", "nav.proyectos", ["admin"], vistaProyectos],
   ["prestamos", "nav.prestamos", ["admin"], vistaPrestamos],
   ["gastos", "nav.gastos", ["admin", "supervisor"], vistaGastos],
+  ["herramientas", "nav.herramientas", ["admin", "supervisor", "dueno"], vistaHerramientas],
   ["companias", "nav.companias", ["admin", "dueno"], vistaCompanias, true],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
   ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],

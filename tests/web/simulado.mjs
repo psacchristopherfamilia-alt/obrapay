@@ -140,6 +140,25 @@ function simulador(quien, llamadas) {
       { empresa_id: EMP.id, tipo: "total", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 1, supervisores: 0, proyectos: 1 },
       { empresa_id: EMP.id, tipo: "sin_asignar", proyecto_id: null, perfil_id: null, nombre: null, trabajadores: 0, supervisores: null, proyectos: null },
       { empresa_id: EMP.id, tipo: "proyecto", proyecto_id: id("f1"), perfil_id: null, nombre: "Villa Grace Bay", trabajadores: 1, supervisores: 0, proyectos: null }],
+    herramientas_inventario: () => {
+      const todas = [
+        { id: id("h1"), empresa_id: EMP.id, empresa: EMP.nombre, nombre: "Taladro percutor", codigo: "TAL-01", valor: 120, notas: null, estado: "bueno", empresa_uso_id: null, empresa_uso: null, supervisor_id: P.ramon.id, supervisor: "Ramón Gómez", trabajador_id: P.juan.id, trabajador: "Juan Pérez", proyecto_id: id("f1"), proyecto: "Villa Grace Bay", creado_en: "2026-10-01T12:00:00Z" },
+        { id: id("h2"), empresa_id: EMP.id, empresa: EMP.nombre, nombre: "Escalera de 12 pies", codigo: null, valor: 85, notas: null, estado: "danado", empresa_uso_id: null, empresa_uso: null, supervisor_id: P.ramon.id, supervisor: "Ramón Gómez", trabajador_id: null, trabajador: null, proyecto_id: id("f1"), proyecto: "Villa Grace Bay", creado_en: "2026-10-01T12:00:00Z" },
+        { id: id("h3"), empresa_id: EMP.id, empresa: EMP.nombre, nombre: "Amoladora", codigo: "AMO-02", valor: 60, notas: null, estado: "perdido", empresa_uso_id: null, empresa_uso: null, supervisor_id: P.ramon.id, supervisor: "Ramón Gómez", trabajador_id: null, trabajador: null, proyecto_id: null, proyecto: null, creado_en: "2026-10-01T12:00:00Z" },
+        { id: id("h4"), empresa_id: EMP2.id, empresa: EMP2.nombre, nombre: "Compresor de aire", codigo: "COM-07", valor: 340, notas: null, estado: "bueno", empresa_uso_id: EMP.id, empresa_uso: EMP.nombre, supervisor_id: null, supervisor: null, trabajador_id: null, trabajador: null, proyecto_id: null, proyecto: null, creado_en: "2026-10-02T12:00:00Z" },
+        { id: id("h5"), empresa_id: EMP2.id, empresa: EMP2.nombre, nombre: "Nivel láser", codigo: null, valor: 150, notas: null, estado: "bueno", empresa_uso_id: null, empresa_uso: null, supervisor_id: null, supervisor: null, trabajador_id: null, trabajador: null, proyecto_id: null, proyecto: null, creado_en: "2026-10-03T12:00:00Z" }];
+      return quien.roles.includes("supervisor") && !quien.roles.includes("admin") ? todas.slice(0, 3) : todas;
+    },
+    herramientas_personas: () => (quien.roles.includes("admin") ? [
+      { empresa_id: EMP.id, tipo: "supervisor", id: P.ramon.id, nombre: "Ramón Gómez", proyecto_id: null },
+      { empresa_id: EMP.id, tipo: "proyecto", id: id("f1"), nombre: "Villa Grace Bay", proyecto_id: null },
+      { empresa_id: EMP.id, tipo: "trabajador", id: P.juan.id, nombre: "Juan Pérez", proyecto_id: null },
+      { empresa_id: EMP2.id, tipo: "supervisor", id: id("b3"), nombre: "Supervisor dos", proyecto_id: null }]
+      : [{ empresa_id: EMP.id, tipo: "trabajador", id: P.juan.id, nombre: "Juan Pérez", proyecto_id: id("f1") },
+         { empresa_id: EMP.id, tipo: "trabajador", id: P.pedro.id, nombre: "Pedro Santos", proyecto_id: id("f1") }]),
+    herramienta_movimientos: () => [
+      { creado_en: "2026-10-03T15:00:00Z", tipo: "estado", nota: "Se cayó del andamio", por: "Ramón Gómez", detalle: { antes: "bueno", despues: "danado" } },
+      { creado_en: "2026-10-01T12:00:00Z", tipo: "creada", nota: null, por: "Administración", detalle: {} }],
     nomina_semana: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA[a.p_semana] : NOMINA[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     nomina_semana_proyectos: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA_PROY[a.p_semana] : NOMINA_PROY[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     reporte_mensual: () => [{ perfil_id: P.juan.id, nombre: "Juan Pérez", semanas: 2, minutos_reg: 4800, minutos_extra: 400, bruto: 1600, seguro: 48, prestamo: 250, neto: 1302 }],
@@ -203,10 +222,10 @@ const navegador = await chromium.launch({ executablePath: "/opt/pw-browsers/chro
 const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
-  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos"], idiomas: ["es"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "companias", "reportes", "seguros", "ajustes"], idiomas: ["es"] },
-  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
+  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -230,7 +249,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -517,6 +536,56 @@ await flujo("dueño ve el resumen separado por compañía", P.dueno, 1360, async
   esperar(/current ltd/i.test(txt) && /mi empresa/i.test(txt), "no muestra las dos compañías");
   esperar(txt.includes("$5,770.00") && txt.includes("$7,200.00") && txt.includes("$12,970.00"), "totales por compañía incorrectos");
   esperar(/equipo · current ltd/i.test(txt) && /ramón gómez/i.test(txt) && /trabajadores a cargo/i.test(txt), "no muestra el equipo por compañía");
+});
+
+await flujo("supervisor encarga una herramienta a un trabajador", P.ramon, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/herramientas`);
+  await pg.waitForSelector("table");
+  esperar((await pg.locator("[data-asignar]").count()) === 0, "el supervisor ve el botón de asignar");
+  esperar((await pg.locator("[data-editar]").count()) === 0, "el supervisor ve el botón de editar");
+  esperar((await pg.locator("#nueva").count()) === 0, "el supervisor ve nueva herramienta");
+  await pg.click(`[data-encargar="${id("h2")}"]`);
+  await pg.selectOption("#e-trab", P.pedro.id);
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/herramienta_a_trabajador") && x.cuerpo.p_id === id("h2") && x.cuerpo.p_trabajador === P.pedro.id), "no encargó la herramienta");
+  await pg.click(`[data-estado="${id("h2")}"]`);
+  await pg.selectOption("#s-estado", "perdido");
+  await pg.fill("#s-nota", "Se perdió en la obra");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/herramienta_estado") && x.cuerpo.p_estado === "perdido" && x.cuerpo.p_nota === "Se perdió en la obra"), "no marcó la herramienta como perdida");
+  await pg.click(`[data-historial="${id("h1")}"]`);
+  await pg.waitForSelector("dialog .lista-simple");
+});
+
+await flujo("admin crea, asigna y presta una herramienta", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/herramientas`);
+  await pg.waitForSelector("#nueva");
+  const txt = await pg.innerText("#vista");
+  esperar(/herramientas · current ltd/i.test(txt) && /dueña: current ltd/i.test(txt), "no muestra las compañías ni la dueña de la prestada");
+  await pg.click("#nueva");
+  await pg.fill("#h-nombre", "Sierra circular");
+  await pg.fill("#h-valor", "95.50");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/crear_herramienta") && x.cuerpo.p_nombre === "Sierra circular" && x.cuerpo.p_valor === 95.5), "no creó la herramienta");
+  await pg.click(`[data-asignar="${id("h5")}"]`);
+  await pg.selectOption("#a-sup", id("b3"));
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/herramienta_a_supervisor") && x.cuerpo.p_id === id("h5")), "no asignó al supervisor");
+  await pg.click(`[data-prestar="${id("h1")}"]`);
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/compartir_herramienta") && x.cuerpo.p_id === id("h1") && x.cuerpo.p_empresa === EMP2.id), "no prestó la herramienta");
+});
+
+await flujo("dueño ve herramientas sin poder cambiarlas", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/herramientas`);
+  await pg.waitForSelector("table");
+  esperar((await pg.locator("#nueva, [data-asignar], [data-encargar], [data-estado], [data-editar], [data-prestar]").count()) === 0, "el dueño ve botones de cambio");
+  esperar((await pg.locator("[data-historial]").count()) > 0, "el dueño no ve el historial");
 });
 
 await navegador.close();

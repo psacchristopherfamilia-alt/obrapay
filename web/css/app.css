@@ -172,6 +172,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); }
 .pildora-ok { background: var(--verde-suave); color: var(--verde); }
 .pildora-aviso { background: var(--ambar-suave); color: var(--arcilla-osc); }
 .pildora-info { background: var(--acento-suave); color: var(--acento); }
+.pildora-error { background: var(--arcilla-suave); color: var(--arcilla); }
+.lista-simple { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 999px; background: var(--superficie); border: 1px solid var(--borde); }
 .seccion { margin-top: 4px; }
