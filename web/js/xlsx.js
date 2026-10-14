@@ -16,7 +16,33 @@ function letraCol(n) {
 // estilos: 0 normal, 1 encabezado en negrita, 2 dinero, 3 número con 2 decimales, 4 total en negrita dinero
 const ESTILO = { texto: 0, numero: 3, dinero: 2, horas: 3 };
 
+// Hoja libre (para reproducir formularios): hoja.libre = filas; cada celda es un valor o { v, e } con e = "neg" (negrita),
+// "din" (dinero), "dinneg" (dinero en negrita), "num" (2 decimales). hoja.anchos = anchos de columna. Sin fila de encabezado fija.
+const ESTILO_LIBRE = { neg: 1, din: 2, num: 3, dinneg: 4 };
+function hojaLibreXml(hoja) {
+  const ncol = Math.max(1, ...hoja.libre.map((f) => f.length));
+  const cols = Array.from({ length: ncol }, (_, i) =>
+    `<col min="${i + 1}" max="${i + 1}" width="${(hoja.anchos || [])[i] || 14}" customWidth="1"/>`).join("");
+  const filas = hoja.libre.map((fila, fi) => {
+    const celdas = fila.map((c, ci) => {
+      const obj = c !== null && typeof c === "object";
+      const v = obj ? c.v : c;
+      const e = obj ? c.e : undefined;
+      if (v === null || v === undefined || v === "") return "";
+      const ref = `${letraCol(ci)}${fi + 1}`;
+      if (typeof v === "number" && Number.isFinite(v)) return `<c r="${ref}" s="${ESTILO_LIBRE[e] ?? 0}"><v>${v}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"${e === "neg" || e === "dinneg" ? ' s="1"' : ""}><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+    }).join("");
+    return `<row r="${fi + 1}">${celdas}</row>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<sheetViews><sheetView workbookViewId="0"/></sheetViews>
+<cols>${cols}</cols><sheetData>${filas.join("")}</sheetData></worksheet>`;
+}
+
 function hojaXml(hoja) {
+  if (hoja.libre) return hojaLibreXml(hoja);
   const cols = hoja.columnas.map((c, i) =>
     `<col min="${i + 1}" max="${i + 1}" width="${c.ancho || Math.max(12, String(c.titulo).length + 4)}" customWidth="1"/>`).join("");
   const filas = [];

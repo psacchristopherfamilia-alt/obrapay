@@ -10,6 +10,7 @@ import {
 } from "./vistas/admin.js";
 import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
+import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
@@ -34,6 +35,7 @@ const RUTAS = [
   ["companias", "nav.companias", ["admin", "dueno"], vistaCompanias, true],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
   ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],
+  ["contador", "nav.contador", ["admin", "dueno"], vistaContador],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
 const rutasDe = (roles) => RUTAS.filter(([, , r, , multi]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1));

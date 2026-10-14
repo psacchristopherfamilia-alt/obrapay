@@ -168,6 +168,21 @@ function simulador(quien, llamadas) {
       { perfil_id: P.marie.id, nombre: "Marie Joseph", numero_nib: null, numero_nhip: null, base_nib: 1680, nib_empleado: 92.4, nib_empleador: 109.2, nib_total: 201.6,
         base_nhip: 1680, nhip_empleado: 50.4, nhip_empleador: 50.4, nhip_total: 100.8, vence_nib: "2026-11-15", vence_nhip: "2026-11-14" }],
     pendientes_registro_nhip: () => [{ perfil_id: P.pedro.id, nombre: "Pedro Santos", permiso_trabajo_aprobado: "2026-10-01", semanas: 2, nhip_acumulado: 468 }],
+    reporte_semanas: () => [
+      { semana_id: id("s2"), inicio: "2026-10-08", fin: "2026-10-14", estado: "abierta", pago: "2026-10-16", anio: 2026, mes: 10, nro: 3 },
+      { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", estado: "cerrada", pago: "2026-10-09", anio: 2026, mes: 10, nro: 2 }],
+    datos_empleador: (a) => [{ empresa_id: a.p_empresa, nombre: a.p_empresa === EMP2.id ? EMP2.nombre : EMP.nombre, nib_registro: "REG-123", nib_seguro: null, direccion: null, apartado: null, telefono: null }],
+    guardar_datos_empleador: () => null,
+    actualizar_nombre_legal: () => null,
+    reporte_seguros: () => [
+      { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", pago: "2026-10-09", nro: 2, perfil_id: P.juan.id, apellido: "Pérez", nombre: "Juan", inicial: null, nombre_completo: "Juan Pérez",
+        numero_nib: "NIB-1", numero_nhip: null, bruto: 72, base_nib: 72, nib_empleado: 3.96, nib_empleador: 4.68, base_nhip: 72, nhip_empleado: 2.16, nhip_empleador: 2.16 },
+      { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", pago: "2026-10-09", nro: 2, perfil_id: P.marie.id, apellido: "Joseph", nombre: "Marie", inicial: null, nombre_completo: "Marie Joseph",
+        numero_nib: null, numero_nhip: null, bruto: 80, base_nib: 80, nib_empleado: 4.4, nib_empleador: 5.2, base_nhip: 80, nhip_empleado: 2.4, nhip_empleador: 2.4 }],
+    reporte_proyectos_pagados: () => [
+      { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", pago: "2026-10-09", nro: 2, proyecto_id: id("f1"), proyecto: "Villa Grace Bay", perfil_id: P.juan.id, trabajador: "Juan Pérez", minutos_reg: 240, minutos_extra: 0, bruto: 72 }],
+    reporte_altas_bajas: () => [
+      { tipo: "alta", perfil_id: P.juan.id, apellido: "Pérez", nombre: "Juan", inicial: null, nombre_completo: "Juan Pérez", numero_nib: "NIB-1", fecha: "2026-10-01" }],
     reporte_mensual_proyectos: () => [{ proyecto_id: id("f1"), proyecto: "Villa Grace Bay", minutos_reg: 3000, minutos_extra: 300, bruto: 990 }],
   };
   const TABLAS = {
@@ -223,9 +238,9 @@ const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "contador", "ajustes"], idiomas: ["es", "en"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -249,7 +264,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -586,6 +601,40 @@ await flujo("dueño ve herramientas sin poder cambiarlas", P.dueno, 1360, async 
   await pg.waitForSelector("table");
   esperar((await pg.locator("#nueva, [data-asignar], [data-encargar], [data-estado], [data-editar], [data-prestar]").count()) === 0, "el dueño ve botones de cambio");
   esperar((await pg.locator("[data-historial]").count()) > 0, "el dueño no ve el historial");
+});
+
+await flujo("admin descarga los archivos del contador y edita los datos del empleador", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/contador`);
+  await pg.waitForSelector("[data-bajar=nib]");
+  esperar(await pg.locator("#c-sem option").count() === 1, "la lista de semanas debe tener solo la semana cerrada");
+  let [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-bajar=nib]")]);
+  esperar(/^nib_mi-empresa_2026-10-01\.xlsx$/.test(d.suggestedFilename()), `nombre semanal inesperado ${d.suggestedFilename()}`);
+  await pg.selectOption("#c-modo", "mes");
+  await pg.selectOption("#c-mes", "10");
+  await pg.selectOption("#c-anio", "2026");
+  [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-bajar=nib]")]);
+  esperar(/^nib-ins007_mi-empresa_2026-10\.xlsx$/.test(d.suggestedFilename()), `nombre mensual inesperado ${d.suggestedFilename()}`);
+  const archivo = join(CAPTURAS, d.suggestedFilename());
+  await d.saveAs(archivo);
+  const xml = (await readFile(archivo)).toString("latin1");  // el ZIP va sin comprimir
+  esperar(xml.includes("PART A") && xml.includes("PART B") && xml.includes("PART C") && xml.includes("Week 5") && xml.includes(">N<"), "el Excel mensual no sigue el formulario INS.007");
+  esperar(ll.some((x) => x.ruta.endsWith("/reporte_seguros") && x.cuerpo.p_desde === "2026-10-01" && x.cuerpo.p_hasta === "2026-10-31"), "no pidió el mes completo");
+  esperar(ll.some((x) => x.ruta.endsWith("/reporte_altas_bajas") && x.cuerpo.p_anio === 2026 && x.cuerpo.p_mes === 10), "no pidió altas y bajas");
+  [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-bajar=nhip]")]);
+  esperar(/^nhip_/.test(d.suggestedFilename()), "no descargó el NHIP");
+  [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-bajar=proy]")]);
+  esperar(/^pagado-por-proyecto_/.test(d.suggestedFilename()), "no descargó el pagado por proyecto");
+  await pg.click("#editar-emp");
+  await pg.fill("#e-dir", "Leeward Highway");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/guardar_datos_empleador") && x.cuerpo.p_direccion === "Leeward Highway" && x.cuerpo.p_empresa === EMP.id), "no guardó los datos del empleador");
+});
+
+await flujo("dueño ve el reporte del contador sin editar los datos", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/contador`);
+  await pg.waitForSelector("[data-bajar=nib]");
+  esperar((await pg.locator("#editar-emp").count()) === 0, "el dueño ve el botón de editar datos del empleador");
 });
 
 await navegador.close();

@@ -36,7 +36,7 @@ export async function vistaSeguros(el, ctx) {
       api.rpc("reporte_remesa", { p_anio: anio, p_mes: mes }),
       api.rpc("pendientes_registro_nhip"),
       api.sel("tasas_estatutarias", "select=*&order=vigente_desde.desc"),
-      api.sel("perfiles", "select=id,nombre,roles,activo,numero_nib,numero_nhip,permiso_trabajo_aprobado&activo=eq.true&order=nombre"),
+      api.sel("perfiles", "select=id,nombre,roles,activo,numero_nib,numero_nhip,permiso_trabajo_aprobado,apellido_legal,nombre_legal,inicial_legal&activo=eq.true&order=nombre"),
       api.sel("tarifas", "select=perfil_id,monto_hora,vigente_desde"),
     ]);
     perfiles = perfiles.filter((p) => p.roles.includes("trabajador"));
@@ -151,6 +151,11 @@ export async function vistaSeguros(el, ctx) {
           <div class="campo"><label for="d-nib">${t("seg.nib_num")}</label><input id="d-nib" name="nib" maxlength="40" value="${p.numero_nib || ""}"></div>
           <div class="campo"><label for="d-nhip">${t("seg.nhip_num")}</label><input id="d-nhip" name="nhip" maxlength="40" value="${p.numero_nhip || ""}"></div>
         </div>
+        ${esAdmin ? html`<div class="dos-col">
+          <div class="campo"><label for="d-ape">${t("cont.apellido_legal")}</label><input id="d-ape" name="ape" maxlength="60" value="${p.apellido_legal || ""}"></div>
+          <div class="campo"><label for="d-nom">${t("cont.nombre_legal")}</label><input id="d-nom" name="nom" maxlength="60" value="${p.nombre_legal || ""}"></div>
+        </div>
+        <div class="campo"><label for="d-ini">${t("cont.inicial")}</label><input id="d-ini" name="ini" maxlength="1" value="${p.inicial_legal || ""}"></div>` : ""}
         <div class="campo"><label for="d-perm">${t("seg.permiso")}</label><input id="d-perm" name="perm" type="date" value="${p.permiso_trabajo_aprobado || ""}"></div>
         <p class="error-form" role="alert" hidden></p>
         <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
@@ -163,6 +168,7 @@ export async function vistaSeguros(el, ctx) {
       try {
         await ocupado(f.querySelector("[type=submit]"), () => api.rpc("actualizar_datos_estatutarios", {
           p_perfil: perfilId, p_numero_nib: f.nib.value, p_numero_nhip: f.nhip.value, p_permiso_aprobado: f.perm.value || null }));
+        if (esAdmin) await api.rpc("actualizar_nombre_legal", { p_perfil: perfilId, p_apellido: f.ape.value, p_nombre: f.nom.value, p_inicial: f.ini.value });
         cerrarModal(); aviso(t("comun.guardado")); await cargar();
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
