@@ -252,7 +252,7 @@ export async function vistaMiPago(el, ctx) {
         <div class="linea"><span>${t("pago.horas", { reg: horas(n.minutos_reg), extra: horas(n.minutos_extra) })}</span><span class="mono">${horas(n.minutos_reg + n.minutos_extra)}</span></div>
         <div class="linea fuerte"><span>${t("pago.bruto")}</span><span class="mono">${dinero(n.bruto)}</span></div>
         <hr>
-        <div class="linea rojo"><span>${t("pago.seguro", { pct: Number(n.seguro_pct) })}</span><span class="mono">−${dinero(n.seguro)}</span></div>
+        <div class="linea rojo"><span>${t("pago.seguro")}</span><span class="mono">−${dinero(n.seguro)}</span></div>
         <div class="linea rojo"><span>${t("pago.prestamo")}</span><span class="mono">−${dinero(n.prestamo)}</span></div>
         <hr>
         <div class="linea total"><span>${t("pago.neto_corto")}</span><span class="mono">${dinero(n.neto)}</span></div>

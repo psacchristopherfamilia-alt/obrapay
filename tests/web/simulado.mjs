@@ -74,11 +74,11 @@ const TARIFAS = [
 const SEGUROS = [P.juan, P.marie, P.pedro].map((p) => ({ perfil_id: p.id, porcentaje: 3, vigente_desde: "2026-09-01" }));
 const NOMINA = {
   [id("s1")]: [
-    { perfil_id: P.juan.id, nombre: "Juan Pérez", oficio: "Plomero", minutos_reg: 2400, minutos_extra: 360, tarifa: 18, bruto: 828, seguro_pct: 3, seguro: 24.84, prestamo: 50, neto: 753.16, con_aprobacion_admin: false, estado_semana: "cerrada" },
-    { perfil_id: P.marie.id, nombre: "Marie Joseph", oficio: "Electricista", minutos_reg: 2400, minutos_extra: 120, tarifa: 20, bruto: 840, seguro_pct: 3, seguro: 25.2, prestamo: 0, neto: 814.8, con_aprobacion_admin: true, estado_semana: "cerrada" },
+    { perfil_id: P.juan.id, nombre: "Juan Pérez", oficio: "Plomero", minutos_reg: 2400, minutos_extra: 360, tarifa: 18, bruto: 828, seguro_pct: 0, seguro: 70.38, prestamo: 50, neto: 707.62, con_aprobacion_admin: false, estado_semana: "cerrada" },
+    { perfil_id: P.marie.id, nombre: "Marie Joseph", oficio: "Electricista", minutos_reg: 2400, minutos_extra: 120, tarifa: 20, bruto: 840, seguro_pct: 0, seguro: 71.4, prestamo: 0, neto: 768.6, con_aprobacion_admin: true, estado_semana: "cerrada" },
   ],
   [id("s2")]: [
-    { perfil_id: P.juan.id, nombre: "Juan Pérez", oficio: "Plomero", minutos_reg: 420, minutos_extra: 0, tarifa: 18, bruto: 126, seguro_pct: 3, seguro: 3.78, prestamo: 0, neto: 122.22, con_aprobacion_admin: false, estado_semana: "abierta" },
+    { perfil_id: P.juan.id, nombre: "Juan Pérez", oficio: "Plomero", minutos_reg: 420, minutos_extra: 0, tarifa: 18, bruto: 126, seguro_pct: 0, seguro: 10.71, prestamo: 0, neto: 115.29, con_aprobacion_admin: false, estado_semana: "abierta" },
   ],
   [id("s0")]: [],
 };
@@ -116,6 +116,12 @@ function simulador(quien, llamadas) {
     nomina_semana: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA[a.p_semana] : NOMINA[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     nomina_semana_proyectos: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA_PROY[a.p_semana] : NOMINA_PROY[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     reporte_mensual: () => [{ perfil_id: P.juan.id, nombre: "Juan Pérez", semanas: 2, minutos_reg: 4800, minutos_extra: 400, bruto: 1600, seguro: 48, prestamo: 250, neto: 1302 }],
+    reporte_remesa: () => [
+      { perfil_id: P.juan.id, nombre: "Juan Pérez", numero_nib: "NIB-1", numero_nhip: null, base_nib: 1656, nib_empleado: 91.08, nib_empleador: 107.64, nib_total: 198.72,
+        base_nhip: 1656, nhip_empleado: 49.68, nhip_empleador: 49.68, nhip_total: 99.36, vence_nib: "2026-11-15", vence_nhip: "2026-11-14" },
+      { perfil_id: P.marie.id, nombre: "Marie Joseph", numero_nib: null, numero_nhip: null, base_nib: 1680, nib_empleado: 92.4, nib_empleador: 109.2, nib_total: 201.6,
+        base_nhip: 1680, nhip_empleado: 50.4, nhip_empleador: 50.4, nhip_total: 100.8, vence_nib: "2026-11-15", vence_nhip: "2026-11-14" }],
+    pendientes_registro_nhip: () => [{ perfil_id: P.pedro.id, nombre: "Pedro Santos", permiso_trabajo_aprobado: "2026-10-01", semanas: 2, nhip_acumulado: 468 }],
     reporte_mensual_proyectos: () => [{ proyecto_id: id("f1"), proyecto: "Villa Grace Bay", minutos_reg: 3000, minutos_extra: 300, bruto: 990 }],
   };
   const TABLAS = {
@@ -125,6 +131,9 @@ function simulador(quien, llamadas) {
     tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => AVISOS,
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
     proyecto_trabajadores: () => [{ proyecto_id: id("f1"), perfil_id: P.juan.id, proyectos: PROY[0] }, { proyecto_id: id("f2"), perfil_id: P.juan.id, proyectos: PROY[1] }, { proyecto_id: id("f2"), perfil_id: P.marie.id, proyectos: PROY[1] }, { proyecto_id: id("f1"), perfil_id: P.pedro.id, proyectos: PROY[0] }],
+    tasas_estatutarias: () => [
+      { agencia: "NIB", tasa_empleado: 5.5, tasa_empleador: 6.5, tope_mensual: 6000, dia_vencimiento: 15, vigente_desde: "2026-01-01" },
+      { agencia: "NHIP", tasa_empleado: 3, tasa_empleador: 3, tope_mensual: 7800, dia_vencimiento: 14, vigente_desde: "2026-01-01" }],
     proyecto_supervisores: () => [{ proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
@@ -165,9 +174,9 @@ const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar"], idiomas: ["es"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "reportes", "ajustes"], idiomas: ["es"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "reportes", "seguros", "ajustes"], idiomas: ["es"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "reportes"], idiomas: ["es", "en"] },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "reportes", "seguros"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -302,7 +311,6 @@ await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {
   await pg.fill("#n-nombre", "José Ángel Núñez");
   esperar((await pg.inputValue("#n-usuario")) === "jose.nunez", "no sugirió el usuario");
   await pg.fill("#n-tarifa", "16.50");
-  await pg.fill("#n-seguro", "3");
   await pg.click("dialog button[type=submit]");
   await pg.waitForSelector(".credenciales");
   esperar((await pg.innerText(".credenciales")).includes("sol-mar-isla-42"), "no mostró la contraseña temporal");
@@ -327,7 +335,7 @@ await flujo("admin cambia tarifa y exporta Excel", P.admin, 1360, async (pg, ll)
   esperar(descarga.suggestedFilename() === "nomina_2026-10-01_2026-10-07.xlsx", `nombre inesperado ${descarga.suggestedFilename()}`);
 });
 
-await flujo("admin restablece contraseña y cambia seguro", P.admin, 1360, async (pg, ll) => {
+await flujo("admin restablece contraseña", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/trabajadores`);
   await pg.click(`[data-editar="${P.juan.id}"]`);
   await pg.click("[data-ir-clave]");
@@ -335,12 +343,7 @@ await flujo("admin restablece contraseña y cambia seguro", P.admin, 1360, async
   await pg.waitForSelector(".credenciales");
   esperar(ll.some((x) => x.ruta.includes("crear-trabajador") && x.cuerpo.accion === "restablecer" && x.cuerpo.perfil_id === P.juan.id), "no restableció");
   await pg.click("dialog [data-cerrar]");
-  await pg.click(`[data-editar="${P.juan.id}"]`);
-  await pg.click("[data-ir-seguro]");
-  await pg.fill("#m-valor", "4");
-  await pg.click("dialog button[type=submit]");
-  await pg.waitForTimeout(300);
-  esperar(ll.some((x) => x.ruta.endsWith("/cambiar_seguro") && x.cuerpo.p_porcentaje === 4), "no cambió el seguro");
+  esperar(!(await pg.content()).includes("data-ir-seguro"), "quedó el botón del seguro %");
 });
 
 await flujo("admin fija descuento de préstamo", P.admin, 1360, async (pg, ll) => {
@@ -371,6 +374,42 @@ await flujo("admin cierra y reabre semana", P.admin, 1360, async (pg, ll) => {
   await pg.click("dialog button[type=submit]");
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.ruta.endsWith("/reabrir_semana") && x.cuerpo.p_motivo === "Revisar horas de Juan"), "no reabrió");
+});
+
+await flujo("admin cambia tasa NHIP, guarda datos de seguro y exporta la remesa", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/seguros`);
+  await pg.waitForSelector("[data-tasa=NHIP]");
+  const texto = await pg.textContent("body");
+  esperar(texto.includes("$400.32") || texto.includes("$300.00") || texto.includes("$198.72"), "no muestra la remesa por trabajador");
+  esperar(texto.includes("Pedro Santos") && texto.includes("$468.00"), "no muestra el permiso sin número NHIP");
+  await pg.click("[data-tasa=NHIP]");
+  await pg.fill("#s-emp", "4");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/cambiar_tasa_estatutaria") && x.cuerpo.p_agencia === "NHIP" && x.cuerpo.p_tasa_empleado === 4 && x.cuerpo.p_tope_mensual === 7800), "no cambió la tasa");
+  await pg.click(`[data-datos="${P.juan.id}"]`);
+  await pg.fill("#d-nhip", "NHIP-1");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/actualizar_datos_estatutarios") && x.cuerpo.p_numero_nhip === "NHIP-1" && x.cuerpo.p_perfil === P.juan.id), "no guardó los datos de seguro");
+  const [descarga] = await Promise.all([pg.waitForEvent("download"), pg.click("#excel")]);
+  esperar(/^remesa_\d{4}-\d{2}\.xlsx$/.test(descarga.suggestedFilename()), `nombre inesperado ${descarga.suggestedFilename()}`);
+});
+
+await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/seguros`);
+  await pg.waitForSelector("[data-tasa=NIB]");
+  await pg.click("[data-tasa=NIB]");
+  await pg.fill("#s-dia", "30");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar(!ll.some((x) => x.ruta.endsWith("/cambiar_tasa_estatutaria")), "envió una tasa inválida");
+});
+
+await flujo("dueño ve los seguros sin poder editar", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/seguros`);
+  await pg.waitForSelector("table");
+  esperar((await pg.locator("[data-tasa], [data-datos]").count()) === 0, "el dueño ve botones de edición");
 });
 
 await navegador.close();

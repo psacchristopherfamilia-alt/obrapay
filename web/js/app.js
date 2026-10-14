@@ -9,6 +9,7 @@ import {
   vistaNomina, vistaTurnos, vistaTrabajadores, vistaProyectos, vistaPrestamos, vistaReportes, vistaAjustes,
 } from "./vistas/admin.js";
 import { vistaResumen } from "./vistas/dueno.js";
+import { vistaSeguros } from "./vistas/seguros.js";
 
 const raiz = document.getElementById("app");
 export const ctx = { perfil: null, empresa: null, roles: [] };
@@ -26,6 +27,7 @@ const RUTAS = [
   ["proyectos", "nav.proyectos", ["admin"], vistaProyectos],
   ["prestamos", "nav.prestamos", ["admin"], vistaPrestamos],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
+  ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
 const rutasDe = (roles) => RUTAS.filter(([, , r]) => r.some((x) => roles.includes(x)));

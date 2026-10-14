@@ -98,18 +98,18 @@ export function exportarNomina(d, semana, empresa) {
       { titulo: t("col.trabajador"), ancho: 26 }, { titulo: t("col.oficio"), ancho: 16 },
       { titulo: t("col.tarifa"), tipo: "dinero" }, { titulo: t("col.horas_reg"), tipo: "horas" },
       { titulo: t("col.extra"), tipo: "horas" }, { titulo: t("col.horas"), tipo: "horas" },
-      { titulo: t("col.bruto"), tipo: "dinero" }, { titulo: t("col.seguro_pct"), tipo: "numero" },
+      { titulo: t("col.bruto"), tipo: "dinero" },
       { titulo: t("col.seguro"), tipo: "dinero" }, { titulo: t("col.prestamo"), tipo: "dinero" },
       { titulo: t("col.neto"), tipo: "dinero" }, { titulo: t("col.estado"), ancho: 22 },
     ],
     filas: d.filas.map((f) => [
       f.nombre, f.oficio || "", r2(f.tarifa), horasDecimal(f.minutos_reg), horasDecimal(f.minutos_extra),
-      horasDecimal(f.minutos_reg + f.minutos_extra), r2(f.bruto), r2(f.seguro_pct), r2(f.seguro), r2(f.prestamo), r2(f.neto),
+      horasDecimal(f.minutos_reg + f.minutos_extra), r2(f.bruto), r2(f.seguro), r2(f.prestamo), r2(f.neto),
       f.con_aprobacion_admin ? t("estado.con_admin") : t("estado.aprobado"),
     ]),
   };
   const total = [t("col.total"), "", null, horasDecimal(d.tot.reg), horasDecimal(d.tot.extra), horasDecimal(d.tot.reg + d.tot.extra),
-    r2(d.tot.bruto), null, r2(d.tot.seguro), r2(d.tot.prestamo), r2(d.tot.neto), ""];
+    r2(d.tot.bruto), r2(d.tot.seguro), r2(d.tot.prestamo), r2(d.tot.neto), ""];
   total.__total = true;
   hojaNomina.filas.push(total);
   const hojaProyectos = {
@@ -300,14 +300,13 @@ function mostrarCredenciales(usuario, clave, titulo) {
 }
 
 export async function vistaTrabajadores(el, ctx) {
-  let perfiles = []; let tarifas = []; let seguros = [];
+  let perfiles = []; let tarifas = [];
   const hoy = hoyLocal();
 
   const cargar = async () => {
-    [perfiles, tarifas, seguros] = await Promise.all([
+    [perfiles, tarifas] = await Promise.all([
       api.sel("perfiles", "select=id,usuario,nombre,oficio,roles,activo,debe_cambiar_clave&order=activo.desc,nombre.asc"),
       api.sel("tarifas", "select=perfil_id,monto_hora,vigente_desde"),
-      api.sel("seguros", "select=perfil_id,porcentaje,vigente_desde"),
     ]);
     el.innerHTML = String(html`
       <div class="titulo-vista"><h1>${t("trab.titulo")}</h1>
@@ -315,17 +314,15 @@ export async function vistaTrabajadores(el, ctx) {
       <div class="tabla-caja" role="region" aria-label="${t("trab.titulo")}" tabindex="0">
         <table class="tabla">
           <thead><tr><th scope="col">${t("col.nombre")}</th><th scope="col">${t("acceso.usuario")}</th><th scope="col">${t("col.oficio")}</th>
-            <th scope="col">${t("col.roles")}</th><th scope="col" class="num">${t("col.tarifa")}</th><th scope="col" class="num">${t("col.seguro_pct")}</th>
+            <th scope="col">${t("col.roles")}</th><th scope="col" class="num">${t("col.tarifa")}</th>
             <th scope="col">${t("col.estado")}</th><th scope="col"><span class="oculto">${t("comun.acciones")}</span></th></tr></thead>
           <tbody>${perfiles.map((p) => {
             const tar = vigente(tarifas.filter((x) => x.perfil_id === p.id), hoy, "monto_hora");
-            const seg = vigente(seguros.filter((x) => x.perfil_id === p.id), hoy, "porcentaje");
             const marca = p.roles.includes("trabajador");
             return html`<tr class="${p.activo ? "" : "inactivo"}">
               <th scope="row">${p.nombre}</th><td class="mono">${p.usuario}</td><td>${p.oficio || ""}</td>
               <td>${p.roles.map((r) => t(`rol.${r}`)).join(", ")}</td>
               <td class="num mono">${marca && tar !== null ? dinero(tar) : "—"}</td>
-              <td class="num mono">${marca && seg !== null ? `${seg}%` : "—"}</td>
               <td>${p.activo ? (p.debe_cambiar_clave ? html`<span class="pildora pildora-info">${t("trab.pendiente_clave")}</span>` : html`<span class="pildora pildora-ok">${t("trab.activo")}</span>`) : html`<span class="pildora">${t("trab.inactivo")}</span>`}</td>
               <td><div class="acciones-fila">
                 ${marca ? html`<button type="button" class="btn btn-sec btn-chico" data-tarifa="${p.id}">${t("trab.tarifa")}</button>` : ""}
@@ -350,7 +347,6 @@ export async function vistaTrabajadores(el, ctx) {
         </div></fieldset>
         <div class="tres-col" id="bloque-pago">
           <div class="campo"><label for="n-tarifa">${t("trab.tarifa_hora")}</label><input id="n-tarifa" name="tarifa" type="number" min="0.01" step="0.01" inputmode="decimal"></div>
-          <div class="campo"><label for="n-seguro">${t("col.seguro_pct")}</label><input id="n-seguro" name="seguro" type="number" min="0" max="100" step="0.01" value="0" inputmode="decimal"></div>
           <div class="campo"><label for="n-desde">${t("trab.desde")}</label><input id="n-desde" name="desde" type="date" value="${hoy}"></div>
         </div>
         <div class="campo"><label for="n-idioma">${t("comun.idioma")}</label>
@@ -378,7 +374,7 @@ export async function vistaTrabajadores(el, ctx) {
       try {
         const r = await ocupado(f.querySelector("[type=submit]"), () => api.funcion("crear-trabajador", {
           accion: "crear", usuario: v.usuario.trim().toLowerCase(), nombre: v.nombre.trim(), oficio: v.oficio,
-          roles, tarifa: Number(v.tarifa), seguro_pct: Number(v.seguro || 0), vigente_desde: v.desde, idioma: v.idioma,
+          roles, tarifa: Number(v.tarifa), seguro_pct: 0, vigente_desde: v.desde, idioma: v.idioma,
         }));
         cerrarModal();
         await cargar();
@@ -387,19 +383,18 @@ export async function vistaTrabajadores(el, ctx) {
     });
   };
 
-  const abrirMonto = (perfil, tipo) => {
-    const esTarifa = tipo === "tarifa";
-    const lista = (esTarifa ? tarifas : seguros).filter((x) => x.perfil_id === perfil.id)
+  const abrirMonto = (perfil) => {
+    const lista = tarifas.filter((x) => x.perfil_id === perfil.id)
       .sort((a, b) => (a.vigente_desde < b.vigente_desde ? 1 : -1));
-    const d = abrirModal(t(esTarifa ? "trab.cambiar_tarifa" : "trab.cambiar_seguro", { nombre: perfil.nombre }), html`
+    const d = abrirModal(t("trab.cambiar_tarifa", { nombre: perfil.nombre }), html`
       <form class="form" novalidate>
         <div class="dos-col">
-          <div class="campo"><label for="m-valor">${esTarifa ? t("trab.tarifa_hora") : t("col.seguro_pct")}</label>
-            <input id="m-valor" name="valor" type="number" step="0.01" min="${esTarifa ? "0.01" : "0"}" ${esTarifa ? "" : html`max="100"`} required inputmode="decimal"></div>
+          <div class="campo"><label for="m-valor">${t("trab.tarifa_hora")}</label>
+            <input id="m-valor" name="valor" type="number" step="0.01" min="0.01" required inputmode="decimal"></div>
           <div class="campo"><label for="m-desde">${t("trab.desde")}</label><input id="m-desde" name="desde" type="date" required value="${hoy}"></div>
         </div>
-        ${esTarifa ? html`<p class="nota">${t("trab.aviso_tarifa")}</p>` : ""}
-        ${lista.length ? html`<h3 class="etiqueta">${t("trab.historial")}</h3><ul class="historial">${lista.map((x) => html`<li><span>${fmtDia(x.vigente_desde, { day: "numeric", month: "short", year: "numeric" })}</span><span class="mono">${esTarifa ? dinero(x.monto_hora) : `${x.porcentaje}%`}</span></li>`)}</ul>` : ""}
+        <p class="nota">${t("trab.aviso_tarifa")}</p>
+        ${lista.length ? html`<h3 class="etiqueta">${t("trab.historial")}</h3><ul class="historial">${lista.map((x) => html`<li><span>${fmtDia(x.vigente_desde, { day: "numeric", month: "short", year: "numeric" })}</span><span class="mono">${dinero(x.monto_hora)}</span></li>`)}</ul>` : ""}
         <p class="error-form" role="alert" hidden></p>
         <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
           <button type="submit" class="btn btn-pri">${t("comun.guardar")}</button></div>
@@ -409,13 +404,11 @@ export async function vistaTrabajadores(el, ctx) {
       ev.preventDefault();
       const err = f.querySelector(".error-form");
       const valor = Number(f.valor.value);
-      if (!f.valor.value || Number.isNaN(valor) || (esTarifa && valor <= 0) || valor < 0 || (!esTarifa && valor > 100)) {
+      if (!f.valor.value || Number.isNaN(valor) || valor <= 0) {
         err.hidden = false; err.textContent = t("trab.valor_invalido"); return;
       }
       try {
-        await ocupado(f.querySelector("[type=submit]"), () => (esTarifa
-          ? api.rpc("cambiar_tarifa", { p_perfil: perfil.id, p_monto: valor, p_desde: f.desde.value })
-          : api.rpc("cambiar_seguro", { p_perfil: perfil.id, p_porcentaje: valor, p_desde: f.desde.value })));
+        await ocupado(f.querySelector("[type=submit]"), () => api.rpc("cambiar_tarifa", { p_perfil: perfil.id, p_monto: valor, p_desde: f.desde.value }));
         cerrarModal(); aviso(t("comun.guardado")); await cargar();
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
@@ -443,7 +436,6 @@ export async function vistaTrabajadores(el, ctx) {
         <label class="check"><input type="checkbox" name="activo" value="1" ${perfil.activo ? html`checked` : ""}> ${t("trab.puede_entrar")}</label>
         <p class="nota">${t("trab.nota_rol_trabajador")}</p>
         <div class="acciones">
-          ${perfil.roles.includes("trabajador") ? html`<button type="button" class="btn btn-sec btn-chico" data-ir-seguro>${t("trab.seguro")}</button>` : ""}
           <button type="button" class="btn btn-sec btn-chico" data-ir-clave>${t("trab.restablecer")}</button>
         </div>
         <p class="error-form" role="alert" hidden></p>
@@ -451,7 +443,6 @@ export async function vistaTrabajadores(el, ctx) {
           <button type="submit" class="btn btn-pri">${t("comun.guardar")}</button></div>
       </form>`);
     const f = d.querySelector("form");
-    d.querySelector("[data-ir-seguro]")?.addEventListener("click", () => abrirMonto(perfil, "seguro"));
     d.querySelector("[data-ir-clave]").addEventListener("click", () => restablecer(perfil));
     f.addEventListener("submit", async (ev) => {
       ev.preventDefault();
@@ -465,7 +456,7 @@ export async function vistaTrabajadores(el, ctx) {
           nombre: v.nombre.trim(), oficio: v.oficio.trim() || null, roles, activo: !!v.activo,
         }));
         cerrarModal(); aviso(t("comun.guardado")); await cargar();
-        if (necesitaTarifa) abrirMonto({ ...perfil, nombre: v.nombre.trim() }, "tarifa");
+        if (necesitaTarifa) abrirMonto({ ...perfil, nombre: v.nombre.trim() });
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
   };
@@ -476,7 +467,7 @@ export async function vistaTrabajadores(el, ctx) {
     const buscar = (id) => perfiles.find((p) => p.id === id);
     try {
       if (b.id === "nuevo") abrirNuevo();
-      else if (b.dataset.tarifa) abrirMonto(buscar(b.dataset.tarifa), "tarifa");
+      else if (b.dataset.tarifa) abrirMonto(buscar(b.dataset.tarifa));
       else if (b.dataset.editar) abrirEditar(buscar(b.dataset.editar));
     } catch (e) { aviso(mensajeError(e), "error"); }
   });

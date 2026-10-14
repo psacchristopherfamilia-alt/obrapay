@@ -19,7 +19,9 @@ el admin revisa → se paga el viernes. El dueño ve todo en solo lectura.
 supabase/
   migrations/
     ..._esquema.sql       tablas y restricciones
-    ..._calculo.sql       reglas de nómina (regular/extra, almuerzo, tarifa vigente, seguro)
+    ..._calculo.sql       reglas de nómina (regular/extra, almuerzo, tarifa vigente)
+    ..._nib_nhip.sql      NIB y NHIP: tasas, topes mensuales, remesas, permisos sin NHIP
+    ..._cron.sql          aviso diario de remesas por vencer (solo Supabase)
     ..._operaciones.sql   RPC: marcar, aprobar, corregir, tarifas, préstamos, cierres, reportes
     ..._rls.sql           permisos por rol
     ..._cron.sql          cierres automáticos cada 5 minutos (solo Supabase)
@@ -42,7 +44,7 @@ respaldo/                 esquema y catálogos del prototipo anterior
 1. Regular = minutos antes de las 5:00 p.m. (hora local); extra = después. Misma tarifa.
 2. Almuerzo fijo de 12:00 a 1:00 p.m.: el tiempo marcado en ese horario no se paga (configurable: `empresas.almuerzo_inicio`, `almuerzo_fin`).
 3. Tarifa = la vigente en la fecha del turno; un aumento a mitad de semana aplica desde ese día.
-4. Bruto se redondea a centavos al final de la semana. Seguro = % × bruto, redondeado.
+4. Bruto se redondea a centavos al final de la semana. NIB y NHIP: cada uno = tasa del empleado × la parte del bruto que cabe bajo su tope mensual (acumulado del mes por viernes de pago), redondeado por agencia. Ver `docs/radar-seguros-nib-nhip.md`.
 5. Préstamo: lo fija el admin cada semana; nunca más que el saldo ni más que el pago.
 6. Solo cuentan turnos aprobados. Lo aprobado tarde pasa a la semana siguiente.
 7. Al cerrar, la nómina se congela; corregir exige que el admin reabra la semana.

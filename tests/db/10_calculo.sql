@@ -13,7 +13,7 @@ select test.igual((select min_extra from public.minutos_turno('2026-10-01 18:00-
 select test.igual((select min_reg + min_extra from public.minutos_turno('2026-10-01 07:00:40-04', '2026-10-01 07:30:10-04', 'America/Grand_Turk', '17:00')), 30, 'se cuentan minutos completos');
 
 -- ---------------------------------------------------------------------------
--- Caso base del prototipo (sin almuerzo): Juan, 46 h × $18 − 3% − $50 = $753.16
+-- Caso base del prototipo (sin almuerzo): Juan, 46 h × $18 − NIB 5.5% − NHIP 3% − $50 = $707.62
 -- ---------------------------------------------------------------------------
 update public.empresas set almuerzo_inicio = null, almuerzo_fin = null;
 
@@ -39,9 +39,11 @@ create temp table r as
 select test.igual((select minutos_reg from r), 2400, 'Juan: 40 h regulares');
 select test.igual((select minutos_extra from r), 360, 'Juan: 6 h extra');
 select test.igual((select bruto from r), 828.00, 'Juan: bruto $828.00');
-select test.igual((select seguro from r), 24.84, 'Juan: seguro 3% = $24.84');
+select test.igual((select nib_empleado from r), 45.54, 'Juan: NIB empleado 5.5% = $45.54');
+select test.igual((select nhip_empleado from r), 24.84, 'Juan: NHIP empleado 3% = $24.84');
+select test.igual((select seguro from r), 70.38, 'Juan: descuento de seguros = $70.38');
 select test.igual((select prestamo from r), 50.00, 'Juan: préstamo $50.00');
-select test.igual((select neto from r), 753.16, 'Juan: neto $753.16');
+select test.igual((select neto from r), 707.62, 'Juan: neto $707.62');
 select test.igual((select con_aprobacion_admin from r), false, 'Juan: sin aprobaciones del admin');
 
 select test.igual((select round(bruto_exacto, 2) from public._detalle_semana(test.semana('2026-10-01'))
@@ -92,8 +94,8 @@ create temp table rc as
   where perfil_id = '00000000-0000-0000-0000-0000000000c3';
 select test.igual((select minutos_reg from rc), 1230, 'Carlos: 20.5 h tras almuerzo');
 select test.igual((select bruto from rc), 266.50, 'Carlos: 20.5 h × $13 = $266.50');
-select test.igual((select seguro from rc), 8.00, 'Carlos: seguro 3% redondeado a $8.00');
-select test.igual((select neto from rc), 258.50, 'Carlos: neto $258.50');
+select test.igual((select seguro from rc), 22.66, 'Carlos: NIB $14.66 + NHIP $8.00 = $22.66');
+select test.igual((select neto from rc), 243.84, 'Carlos: neto $243.84');
 
 -- Pedro marca salida a las 12 y entrada a la 1: no se descuenta dos veces.
 -- Otro día trabaja 11:30–6:00 p.m.: 4.5 h regulares (sin la hora de almuerzo) + 1 h extra.

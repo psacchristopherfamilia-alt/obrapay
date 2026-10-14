@@ -72,11 +72,15 @@ auditoría. La construcción tiene muchos titulares de permiso.
 4-6 días: 1 modelo+RLS, 2 cálculo+pruebas, 1 reportes, 1 UI y avisos.
 
 ## Estado en este repositorio (supabase/migrations + web/)
-- Hoy el seguro es UN solo porcentaje por perfil con vigencia (tabla `seguros`, función `seguro_vigente`)
-  aplicado como `seguro = % x bruto` en el cálculo semanal. No separa NIB de NHIP, no tiene tope mensual,
-  ni aporte patronal, ni fechas de remesa.
-- Pendiente (en orden sugerido): 1) tabla de tasas por agencia con vigencia (NIB/NHIP, empleado/empleador,
-  tope mensual, día de vencimiento); 2) cálculo semanal con base acumulada del mes y tope por agencia;
-  3) reporte de remesa mensual (NHIP día 14, NIB día 15); 4) campos NIB/NHIP y fechas de permiso en el perfil
-  + vista de brecha; 5) aviso de tarifa bajo el mínimo de construcción ($9/h).
-- Cada paso necesita pruebas en `tests/db/` (ver casos arriba) antes de tocar la nómina real.
+Implementado (migración `20261013000006_nib_nhip.sql`, ya aplicada en producción; aviso diario en `20261013000007_cron.sql`):
+- Tasas por agencia con vigencia (`tasas_estatutarias`: NIB/NHIP, empleado/empleador, tope mensual, día de vencimiento),
+  sembradas por empresa y cambiables solo por el admin (`cambiar_tasa_estatutaria`).
+- Cálculo semanal con base acumulada del mes y tope por agencia. El mes es el del viernes de pago (fin + 2) y se usa la
+  tasa vigente ese día. Descuento al trabajador = NIB empleado + NHIP empleado; el aporte del empleador solo se reporta.
+  `seguro_pct` queda en 0: el antiguo porcentaje único ya no interviene (la tabla `seguros` se conserva sin uso).
+- Reporte de remesa mensual por trabajador (`reporte_remesa`), permisos sin número NHIP (`pendientes_registro_nhip`),
+  números NIB/NHIP y fecha de permiso en el perfil (`actualizar_datos_estatutarios`), aviso 3 días antes del
+  vencimiento (`avisar_remesas`) y tarifa mínima de construcción ($9/h por defecto) validada al cambiar tarifas.
+- Pantalla **Seguros (NIB/NHIP)** en la app (`web/js/vistas/seguros.js`) y pruebas en `tests/db/40_nib_nhip.sql`.
+- Pendiente: confirmar tasas, topes y fechas con el NIB o un contador (las de partida vienen de una sola fuente y las
+  fuentes no coinciden); decidir si el salario mínimo por hora debe poder editarse desde la app (hoy es solo lectura).

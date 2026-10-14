@@ -118,13 +118,13 @@ insert into ids values ('prest_carlos', public.crear_prestamo(pg_temp.yo('c3'), 
 select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 40)$$, 'máximo $0.00', 'sin horas aprobadas no se puede descontar');
 
 reset role;
-select test.turno('c3', 'f1', '2026-10-08', '07:00', '15:30');   -- 7.5 h tras almuerzo × $13 = $97.50; seguro $2.93
+select test.turno('c3', 'f1', '2026-10-08', '07:00', '15:30');   -- 7.5 h tras almuerzo × $13 = $97.50; NIB+NHIP $8.29
 set role authenticated;
 select test.como(pg_temp.yo('a1'));
 select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 350)$$, 'supera el saldo del préstamo ($300.00)', 'no descuenta más que el saldo');
-select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 101)$$, 'máximo $94.57', 'no deja el pago en negativo');
+select test.falla($$select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 101)$$, 'máximo $89.21', 'no deja el pago en negativo');
 select public.fijar_descuento_prestamo((select id from ids where nombre = 'prest_carlos'), test.semana('2026-10-08'), 40);
-select test.igual((select neto from public.nomina_semana(test.semana('2026-10-08')) where perfil_id = pg_temp.yo('c3')), 54.57, 'Carlos: $97.50 − $2.93 − $40.00 = $54.57');
+select test.igual((select neto from public.nomina_semana(test.semana('2026-10-08')) where perfil_id = pg_temp.yo('c3')), 49.21, 'Carlos: $97.50 − $8.29 − $40.00 = $49.21');
 
 -- ===========================================================================
 -- F. Cierre semanal, arrastre de lo aprobado tarde, reabrir y pagar
