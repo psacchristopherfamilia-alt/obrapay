@@ -315,42 +315,117 @@ export async function vistaMisHoras(el, ctx) {
 // ---------------------------------------------------------------------------
 // Recibo de pago imprimible (se guarda como PDF desde el diálogo de impresión del teléfono o la computadora).
 const redondo = (n) => Math.round(Number(n || 0) * 100) / 100;
-function recibo(f, semana, nombre) {
-  const reg = redondo((f.minutos_reg / 60) * f.tarifa);
-  const extra = redondo(f.bruto - reg);
-  const nib = Number(f.nib_empleado || 0), nhip = Number(f.nhip_empleado || 0);
+// Un solo recibo por semana, con todas las compañías: días, lugares y horas por lugar.
+function recibo(filas, turnos, semana, ctx) {
+  const multi = filas.length > 1;
+  const ajustesDe = (id) => ctx.ajustes[id] || ctx.empresa;
+  const tarifaDe = (id) => Number(filas.find((f) => f.empresa_id === id)?.tarifa || 0);
+  const nombreEmp = (id) => filas.find((f) => f.empresa_id === id)?.empresa || ctx.empresas.find((e) => e.id === id)?.nombre || "";
+  const cerrados = turnos.filter((tu) => tu.salida && ["aprobado", "aprobado_admin"].includes(tu.estado));
+  const pendientes = turnos.filter((tu) => tu.salida && tu.estado === "por_aprobar").length;
+  const rows = cerrados.map((tu) => {
+    const emp = tu.proyectos?.empresa_id;
+    return { ...tu, emp, dia: fechaLocal(tu.entrada), lugar: tu.proyectos?.nombre || "", m: minutosTurno(tu.entrada, tu.salida, ajustesDe(emp)) };
+  });
+  const dias = [...new Set(rows.map((r) => r.dia))];
+  const totMin = filas.reduce((a, f) => a + f.minutos_reg + f.minutos_extra, 0);
+  const bruto = filas.reduce((a, f) => a + Number(f.bruto), 0);
+  const neto = filas.reduce((a, f) => a + Number(f.neto), 0);
+  const aporteNib = filas.reduce((a, f) => a + Number(f.nib_empleador || 0), 0);
+  const aporteNhip = filas.reduce((a, f) => a + Number(f.nhip_empleador || 0), 0);
   const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const estado = f.estado_semana === "abierta" ? t("recibo.provisional") : f.estado_semana === "cerrada" ? t("recibo.cerrada") : t("recibo.pagada");
+  const estados = [...new Set(filas.map((f) => f.estado_semana))];
+  const estado = estados.includes("abierta") ? t("recibo.provisional") : estados.every((e) => e === "pagada") ? t("recibo.pagada") : t("recibo.cerrada");
+  const provisional = estados.includes("abierta");
+  const numero = `RP-${String(semana.inicio).replace(/-/g, "")}-${String(ctx.perfil.id).slice(0, 4).toUpperCase()}`;
+  const hoy = fmtDia(hoyLocal(), { day: "numeric", month: "long", year: "numeric" });
+
+  // Detalle por día y lugar
+  const filasDia = dias.map((d) => {
+    const l = rows.filter((r) => r.dia === d);
+    const sub = l.reduce((a, r) => a + r.m.reg + r.m.extra, 0);
+    return html`${l.map((r, i) => html`<tr>
+        <td class="fecha">${i === 0 ? fmtDia(d, { weekday: "short", day: "numeric", month: "short" }) : ""}</td>
+        <td>${r.lugar}${multi ? html` <span class="sub">· ${nombreEmp(r.emp)}</span>` : ""}</td>
+        <td class="mono">${fmtHora(r.entrada)} – ${fmtHora(r.salida)}</td>
+        <td class="der mono">${horas(r.m.reg)}</td>
+        <td class="der mono ${r.m.extra ? "extra" : ""}">${r.m.extra ? horas(r.m.extra) : "–"}</td></tr>`)}
+      ${l.length > 1 ? html`<tr class="sub-dia"><td></td><td colspan="2">${t("recibo.total_dia")}</td><td class="der mono" colspan="2">${horas(sub)}</td></tr>` : ""}`;
+  });
+
+  // Horas por lugar
+  const lugares = [];
+  rows.forEach((r) => {
+    let l = lugares.find((x) => x.lugar === r.lugar && x.emp === r.emp);
+    if (!l) { l = { lugar: r.lugar, emp: r.emp, dias: new Set(), reg: 0, extra: 0 }; lugares.push(l); }
+    l.dias.add(r.dia); l.reg += r.m.reg; l.extra += r.m.extra;
+  });
+  lugares.sort((a, b) => a.lugar.localeCompare(b.lugar));
+  const importe = (l) => {
+    const f = filas.find((x) => x.empresa_id === l.emp);
+    const p = (f?.proyectos || []).find((x) => x.proyecto === l.lugar);
+    return p ? Number(p.bruto) : redondo(((l.reg + l.extra) / 60) * tarifaDe(l.emp));
+  };
+
+  // Ingresos y descuentos (uno por compañía, porque tarifa y porcentajes son de cada una)
+  const bloque = (f) => {
+    const reg = redondo((f.minutos_reg / 60) * f.tarifa);
+    const ext = redondo(f.bruto - reg);
+    const nib = Number(f.nib_empleado || 0); const nhip = Number(f.nhip_empleado || 0); const pre = Number(f.prestamo || 0);
+    return html`<section class="rec-seccion">
+      ${multi ? html`<div class="rec-cia">${f.empresa}</div>` : ""}
+      <div class="rec-dos">
+        <div><div class="etq">${t("recibo.ingresos")}</div><table><tbody>
+          <tr><td>${t("recibo.normales", { h: horas(f.minutos_reg), tarifa: dinero(f.tarifa) })}</td><td class="der mono">${dinero(reg)}</td></tr>
+          <tr><td>${t("recibo.extra", { h: horas(f.minutos_extra), tarifa: dinero(f.tarifa) })}</td><td class="der mono">${dinero(ext)}</td></tr>
+          <tr class="tot"><td>${t("pago.bruto")}</td><td class="der mono">${dinero(f.bruto)}</td></tr></tbody></table></div>
+        <div><div class="etq">${t("recibo.descuentos")}</div><table><tbody>
+          <tr><td>NIB</td><td class="der mono">−${dinero(nib)}</td></tr>
+          <tr><td>NHIP</td><td class="der mono">−${dinero(nhip)}</td></tr>
+          <tr><td>${t("pago.prestamo")}</td><td class="der mono">−${dinero(pre)}</td></tr>
+          <tr class="tot"><td>${t("recibo.total_desc")}</td><td class="der mono">−${dinero(nib + nhip + pre)}</td></tr></tbody></table></div>
+      </div>
+      ${multi ? html`<div class="linea fuerte rec-neto-cia"><span>${t("recibo.neto")} · ${f.empresa}</span><span class="mono">${dinero(f.neto)}</span></div>` : ""}
+    </section>`;
+  };
+
   return html`
     <article class="recibo-hoja">
-      <header class="recibo-cab">
-        <div><div class="recibo-emp">${f.empresa}</div><div class="sub">${t("recibo.titulo")}</div></div>
-        <div class="recibo-estado">${estado}</div>
+      <header class="rec-banda">
+        <div><div class="rec-emp">${filas.map((f) => f.empresa).join(" · ")}</div><div class="rec-sub">${t("recibo.titulo")}</div></div>
+        <div class="rec-doc"><b>${t("recibo.titulo_corto")}</b>${t("recibo.numero")} ${numero}<br><span class="rec-sello">${estado}</span></div>
       </header>
-      <div class="recibo-datos">
-        <div><span class="sub">${t("recibo.trabajador")}</span><b>${nombre}</b></div>
-        <div><span class="sub">${t("comun.semana")}</span><b>${fmtSemana(semana)}</b></div>
-        <div><span class="sub">${t("recibo.fecha_pago")}</span><b>${viernes}</b></div>
+      <div class="rec-cuerpo">
+        <div class="rec-ficha">
+          <div><span class="etq">${t("recibo.trabajador")}</span><b>${ctx.perfil.nombre}</b></div>
+          <div><span class="etq">${t("recibo.periodo")}</span><b>${fmtSemana(semana)}</b></div>
+          <div><span class="etq">${t("recibo.fecha_pago")}</span><b>${viernes}</b></div>
+          <div>${multi ? html`<span class="etq">${t("recibo.companias")}</span><b>${filas.length}</b>` : html`<span class="etq">${t("recibo.tarifa_hora")}</span><b class="mono">${dinero(filas[0].tarifa)}</b>`}</div>
+        </div>
+        <div class="rec-resumen">
+          <div><span class="etq">${t("recibo.dias_trab")}</span><b>${dias.length}</b></div>
+          <div><span class="etq">${t("recibo.horas_pagadas")}</span><b>${horas(totMin)}</b></div>
+          <div><span class="etq">${t("pago.bruto")}</span><b>${dinero(bruto)}</b></div>
+          <div class="rec-resumen-neto"><span class="etq">${t("recibo.neto")}</span><b>${dinero(neto)}</b></div>
+        </div>
+        ${rows.length ? html`
+        <section class="rec-seccion">
+          <div class="etq">${t("recibo.detalle")}</div>
+          <table><thead><tr><th>${t("recibo.dia")}</th><th>${t("recibo.lugar")}</th><th>${t("recibo.entrada_salida")}</th><th class="der">${t("recibo.col_normales")}</th><th class="der">${t("recibo.col_extra")}</th></tr></thead>
+          <tbody>${filasDia}</tbody></table>
+        </section>
+        <section class="rec-seccion">
+          <div class="etq">${t("recibo.por_lugar")}</div>
+          <table><thead><tr><th>${t("recibo.lugar")}</th><th class="der">${t("recibo.dias")}</th><th class="der">${t("recibo.col_normales")}</th><th class="der">${t("recibo.col_extra")}</th><th class="der">${t("recibo.importe")}</th></tr></thead>
+          <tbody>${lugares.map((l) => html`<tr><td>${l.lugar}${multi ? html` <span class="sub">· ${nombreEmp(l.emp)}</span>` : ""}</td><td class="der mono">${l.dias.size}</td><td class="der mono">${horas(l.reg)}</td><td class="der mono">${l.extra ? horas(l.extra) : "–"}</td><td class="der mono">${dinero(importe(l))}</td></tr>`)}
+          <tr class="tot"><td>${t("recibo.total")}</td><td class="der mono">${dias.length}</td><td class="der mono">${horas(lugares.reduce((a, l) => a + l.reg, 0))}</td><td class="der mono">${horas(lugares.reduce((a, l) => a + l.extra, 0))}</td><td class="der mono">${dinero(lugares.reduce((a, l) => a + importe(l), 0))}</td></tr></tbody></table>
+        </section>` : ""}
+        ${filas.map(bloque)}
+        <div class="rec-neto"><span class="etq">${t("recibo.neto")}</span><b>${dinero(neto)}</b></div>
+        <div class="rec-pie"><span>${t("recibo.aporte", { nib: dinero(aporteNib), nhip: dinero(aporteNhip) })}</span><span>${t("recibo.generado", { fecha: hoy })}</span></div>
+        ${pendientes ? html`<p class="nota">${t("recibo.pendientes", { n: pendientes })}</p>` : ""}
+        ${provisional ? html`<p class="nota">${t("recibo.nota_provisional")}</p>` : ""}
       </div>
-      <section class="desglose">
-        <h2 class="etiqueta">${t("recibo.horas")}</h2>
-        <div class="linea"><span>${t("recibo.normales", { h: horas(f.minutos_reg), tarifa: dinero(f.tarifa) })}</span><span class="mono">${dinero(reg)}</span></div>
-        <div class="linea"><span>${t("recibo.extra", { h: horas(f.minutos_extra), tarifa: dinero(f.tarifa) })}</span><span class="mono">${dinero(extra)}</span></div>
-        <div class="linea fuerte"><span>${t("pago.bruto")}</span><span class="mono">${dinero(f.bruto)}</span></div>
-      </section>
-      <section class="desglose">
-        <h2 class="etiqueta">${t("recibo.descuentos")}</h2>
-        <div class="linea"><span>NIB</span><span class="mono">−${dinero(nib)}</span></div>
-        <div class="linea"><span>NHIP</span><span class="mono">−${dinero(nhip)}</span></div>
-        <div class="linea"><span>${t("pago.prestamo")}</span><span class="mono">−${dinero(f.prestamo)}</span></div>
-      </section>
-      <div class="linea total recibo-neto"><span>${t("recibo.neto")}</span><span class="mono">${dinero(f.neto)}</span></div>
-      ${f.proyectos.length ? html`<section class="desglose">
-        <h2 class="etiqueta">${t("pago.por_proyecto")}</h2>
-        ${f.proyectos.map((p) => html`<div class="linea"><span>${p.proyecto} · ${horas(p.minutos)}</span><span class="mono">${dinero(p.bruto)}</span></div>`)}
-      </section>` : ""}
-      <p class="nota">${t("recibo.aporte", { nib: dinero(f.nib_empleador || 0), nhip: dinero(f.nhip_empleador || 0) })}</p>
-      ${f.estado_semana === "abierta" ? html`<p class="nota">${t("recibo.nota_provisional")}</p>` : ""}
     </article>`;
 }
 
@@ -391,7 +466,11 @@ export async function vistaMiPago(el, ctx) {
   };
 
   const cargar = async () => {
-    const filas = await api.rpc("mi_pago", { p_inicio: semana.inicio });
+    const { desde, hasta } = rangoSemana(semana, ctx.empresa.zona_horaria);
+    const [filas, turnos] = await Promise.all([
+      api.rpc("mi_pago", { p_inicio: semana.inicio }),
+      api.sel("turnos", `select=id,entrada,salida,estado,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
+    ]);
     const neto = filas.reduce((a, f) => a + Number(f.neto), 0);
     const estados = [...new Set(filas.map((f) => f.estado_semana))];
     const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long" });
@@ -413,7 +492,7 @@ export async function vistaMiPago(el, ctx) {
       </section>` : ""}
       ${filas.length ? html`<button type="button" id="recibo-pdf" class="btn btn-sec">${t("recibo.descargar")}</button>` : ""}
       <p class="nota">${t("pago.nota")}</p>
-      <div id="recibo-imp" class="solo-impresion">${filas.map((f) => recibo(f, semana, ctx.perfil.nombre))}</div>
+      <div id="recibo-imp" class="solo-impresion">${filas.length ? recibo(filas, turnos, semana, ctx) : ""}</div>
       ${multi ? html`<p class="nota">${t("pago.cia_nota")}</p>` : ""}`);
     el.querySelector("#recibo-pdf")?.addEventListener("click", () => {
       document.body.classList.add("imp-recibo");

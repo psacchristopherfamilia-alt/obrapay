@@ -56,7 +56,7 @@ const SEM = [
   { id: id("s1"), empresa_id: EMP.id, inicio: "2026-10-01", fin: "2026-10-07", estado: "cerrada", reabierta: false },
   { id: id("s0"), empresa_id: EMP.id, inicio: "2026-09-24", fin: "2026-09-30", estado: "pagada", reabierta: false },
 ];
-const nombreProy = (pid) => ({ nombre: PROY.find((p) => p.id === pid).nombre });
+const nombreProy = (pid) => { const p = PROY.find((x) => x.id === pid); return { nombre: p.nombre, empresa_id: p.empresa_id }; };
 const turno = (tid, perfil, proy, entrada, salida, estado, extra = {}) => ({
   id: id(tid), empresa_id: EMP.id, perfil_id: perfil.id, proyecto_id: proy, entrada, salida, estado,
   fuera_de_area: false, cierre_automatico: false, corregido: false, semana_id: null,
@@ -538,8 +538,10 @@ await flujo("trabajador en dos compañías ve un pago por compañía", P.juan, 3
   esperar(txt.includes("Current Ltd") && txt.includes("$55.88") && txt.includes("$36.60"), "falta el bloque de cada compañía");
   esperar((await pg.locator("#recibo-pdf").count()) === 1, "falta el botón del recibo");
   const rec2 = await pg.locator("#recibo-imp").evaluate((n) => n.textContent);
-  esperar(rec2.includes("Torre Sur") && rec2.includes("−$3.96") && rec2.includes("−$2.16") && rec2.includes("$55.88"), "el recibo no trae NIB, NHIP y neto por separado");
-  esperar(rec2.includes("$4.68"), "el recibo no muestra el aporte del patrón");
+  esperar(rec2.includes("Detalle por día y lugar") && rec2.includes("Horas por lugar") && rec2.includes("Villa Grace Bay"), "el recibo no trae el detalle por día y lugar");
+  esperar((await pg.locator("#recibo-imp .recibo-hoja").count()) === 1, "debe haber un solo recibo con las dos compañías");
+  esperar(rec2.includes(EMP.nombre) && rec2.includes(EMP2.nombre) && rec2.includes("−$3.96") && rec2.includes("−$2.16") && rec2.includes("$55.88"), "el recibo no trae NIB, NHIP y neto por separado");
+  esperar(rec2.includes("$7.28") && rec2.includes("$3.36"), "el recibo no muestra el aporte del patrón");
   await pg.evaluate(() => document.body.classList.add("imp-recibo"));
   await pg.pdf({ path: join(CAPTURAS, "recibo-pago.pdf"), format: "Letter" });
   await pg.evaluate(() => document.body.classList.remove("imp-recibo"));
