@@ -1,5 +1,6 @@
 // Arranque, sesión, menú por rol y enrutador.
-import { api } from "./api.js";
+import { api, ApiError } from "./api.js";
+import { vigilar } from "./cola.js";
 import { t, fijarIdioma, idioma, IDIOMAS } from "./i18n.js";
 import { html, esc, crudo, aviso, mensajeError, fijarZona, ICONO, ocupado, cerrarModal } from "./ui.js";
 import { vistaEntrar, vistaCambiarClave } from "./vistas/acceso.js";
@@ -45,8 +46,35 @@ let limpiezas = [];
 export function alSalirDeVista(f) { limpiezas.push(f); }
 function limpiar() { limpiezas.forEach((f) => { try { f(); } catch { /* nada */ } }); limpiezas = []; }
 
+// Copia del contexto para abrir la app sin señal (solo trabajadores marcan sin conexión).
+const llaveCtx = (yo) => `obrapay.ctx.${yo}`;
+function guardarCtx(yo) {
+  try { localStorage.setItem(llaveCtx(yo), JSON.stringify({ perfil: ctx.perfil, empresa: ctx.empresa, empresas: ctx.empresas, ajustes: ctx.ajustes })); } catch { /* nada */ }
+}
+function cargarCtxGuardado(yo) {
+  try {
+    const c = JSON.parse(localStorage.getItem(llaveCtx(yo)));
+    if (!c?.perfil || c.perfil.id !== yo) return false;
+    ctx.perfil = c.perfil; ctx.empresa = c.empresa; ctx.empresas = c.empresas || []; ctx.ajustes = c.ajustes || {};
+    ctx.roles = c.perfil.roles || [];
+    fijarIdioma(c.perfil.idioma);
+    fijarZona(c.empresa?.zona_horaria);
+    return true;
+  } catch { return false; }
+}
+
 async function cargarContexto() {
   const yo = api.sesion().user_id;
+  try {
+    await cargarContextoRed(yo);
+    guardarCtx(yo);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 0 && cargarCtxGuardado(yo)) return;
+    throw e;
+  }
+}
+
+async function cargarContextoRed(yo) {
   const [perfiles, empresas, misEmpresas, ajustes] = await Promise.all([
     api.sel("perfiles", `select=id,empresa_id,usuario,nombre,oficio,roles,idioma,activo,debe_cambiar_clave&id=eq.${yo}`),
     api.sel("empresas", "select=*"),
@@ -128,8 +156,15 @@ async function mostrar() {
   if (!ctx.perfil) {
     raiz.innerHTML = `<div class="cargando-pantalla"><span class="girando grande"></span></div>`;
     try { await cargarContexto(); } catch (e) {
-      await api.salir();
       ctx.perfil = null;
+      if (e instanceof ApiError && e.status === 0) {
+        // Sin señal y sin datos guardados: no se cierra la sesión, se ofrece reintentar.
+        raiz.innerHTML = String(html`<div class="error-vista" role="alert"><p>${mensajeError(e)}</p>
+          <button type="button" class="btn btn-sec" id="reintentar">${t("comun.reintentar")}</button></div>`);
+        raiz.querySelector("#reintentar").addEventListener("click", mostrar);
+        return;
+      }
+      await api.salir();
       vistaEntrar(raiz, iniciar, mensajeError(e));
       return;
     }
@@ -164,11 +199,12 @@ async function mostrar() {
     try { await api.rpc("cambiar_idioma", { p_idioma: nuevo }); } catch { /* se guarda la próxima vez */ }
     mostrar();
   });
+  if (ctx.roles.includes("trabajador")) vigilar(ctx.perfil.id);
   const el = raiz.querySelector("#vista");
   el.innerHTML = `<div class="esqueleto"><div></div><div></div><div></div></div>`;
   try {
     await vista(el, ctx);
-    await pintarAvisos(el, ctx);
+    try { await pintarAvisos(el, ctx); } catch { /* sin señal: los avisos esperan */ }
   } catch (e) {
     if (!api.sesion()) return;
     el.innerHTML = String(html`<div class="error-vista" role="alert"><p>${mensajeError(e)}</p>
@@ -181,7 +217,12 @@ export function recargarVista() { mostrar(); }
 
 function iniciar() { ctx.perfil = null; mostrar(); }
 
-api.alSalir(() => { ctx.perfil = null; ctx.roles = []; ctx.empresas = []; limpiar(); mostrar(); aviso(t("comun.sesion_cerrada"), "info"); });
+api.alSalir(() => { try { if (ctx.perfil) localStorage.removeItem(llaveCtx(ctx.perfil.id)); } catch { /* nada */ } ctx.perfil = null; ctx.roles = []; ctx.empresas = []; limpiar(); mostrar(); aviso(t("comun.sesion_cerrada"), "info"); });
 window.addEventListener("hashchange", mostrar);
 window.addEventListener("unhandledrejection", (ev) => { aviso(mensajeError(ev.reason), "error"); });
 mostrar();
+
+// Permite abrir la app sin señal.
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => { /* sin soporte: la app funciona igual con señal */ }); });
+}

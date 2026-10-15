@@ -1,5 +1,6 @@
 // Vistas del trabajador: Reloj, Mis horas, Mi pago.
-import { api } from "../api.js";
+import { api, ApiError } from "../api.js";
+import { crearMarca, encolar, enviarMarca, descartar, pendientes, leerCola, sincronizar, alCambiarCola } from "../cola.js";
 import { t } from "../i18n.js";
 import {
   html, crudo, dinero, horas, fmtHora, fmtDia, fmtSemana, fechaLocal, hoyLocal, minutosTurno, sumarDias,
@@ -47,36 +48,77 @@ export async function vistaReloj(el, ctx) {
   const ajustesDe = (id) => ctx.ajustes[id] || emp;
   const multi = ctx.empresas.length > 1;
   const nombreEmpresa = (id) => ctx.empresas.find((e) => e.id === id)?.nombre || "";
-  const semana = await semanaActual();
-  const { desde, hasta } = rangoSemana(semana, emp.zona_horaria);
-  const [asignados, turnosSemana, tarifas, avisos] = await Promise.all([
-    api.sel("proyecto_trabajadores", `select=proyecto_id,proyectos(id,nombre,activo,empresa_id)&perfil_id=eq.${yo}`),
-    api.sel("turnos", `select=id,proyecto_id,entrada,salida,estado,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
-    api.sel("tarifas", `select=empresa_id,monto_hora,vigente_desde&perfil_id=eq.${yo}`),
-    api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${yo}&leida=eq.false&tipo=eq.cambio_tarifa&order=creado_en.desc`),
-  ]);
-  // Un turno abierto de una semana anterior también cuenta.
-  const abiertos = await api.sel("turnos", `select=id,proyecto_id,entrada,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&salida=is.null`);
-  const abierto = abiertos[0] || null;
+  // Con señal se baja todo y se guarda una copia; sin señal se usa la copia y las marcas se guardan en el teléfono.
+  const traer = async () => {
+    const semana = await semanaActual();
+    const { desde, hasta } = rangoSemana(semana, emp.zona_horaria);
+    const [asignados, turnosSemana, tarifas, avisos, abiertos] = await Promise.all([
+      api.sel("proyecto_trabajadores", `select=proyecto_id,proyectos(id,nombre,activo,empresa_id)&perfil_id=eq.${yo}`),
+      api.sel("turnos", `select=id,proyecto_id,entrada,salida,estado,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
+      api.sel("tarifas", `select=empresa_id,monto_hora,vigente_desde&perfil_id=eq.${yo}`),
+      api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${yo}&leida=eq.false&tipo=eq.cambio_tarifa&order=creado_en.desc`),
+      // Un turno abierto de una semana anterior también cuenta.
+      api.sel("turnos", `select=id,proyecto_id,entrada,proyectos(nombre,empresa_id)&perfil_id=eq.${yo}&salida=is.null`),
+    ]);
+    return { semana, asignados, turnosSemana, tarifas, avisos, abiertos, guardado_en: new Date().toISOString() };
+  };
+  const llaveCopia = `obrapay.reloj.${yo}`;
+  // Si había marcas por enviar, se intenta enviarlas primero (sin esperar más de unos segundos).
+  if (pendientes(yo).length) await Promise.race([sincronizar(yo).catch(() => {}), new Promise((r) => setTimeout(r, 5000))]);
+  let datos;
+  let sinSenal = false;
+  try {
+    datos = await traer();
+    try { localStorage.setItem(llaveCopia, JSON.stringify(datos)); } catch { /* nada */ }
+  } catch (e) {
+    let copia = null;
+    try { copia = JSON.parse(localStorage.getItem(llaveCopia)); } catch { /* nada */ }
+    if (!(e instanceof ApiError && e.status === 0) || !copia) throw e;
+    datos = copia;
+    sinSenal = true;
+  }
+  const { asignados, tarifas, avisos } = datos;
   const proyectos = asignados.map((a) => a.proyectos).filter((p) => p && p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre));
 
-  let elegido = abierto ? abierto.proyecto_id : (proyectos.length === 1 ? proyectos[0].id : null);
-  try { const g = localStorage.getItem("obrapay.proyecto"); if (!abierto && g && proyectos.some((p) => p.id === g)) elegido = g; } catch { /* nada */ }
+  // Estado actual = datos del servidor + marcas guardadas en el teléfono que el servidor todavía no tiene.
+  const calcular = () => {
+    let abierto = datos.abiertos[0] || null;
+    const turnos = [...datos.turnosSemana];
+    const guardadoEn = new Date(datos.guardado_en || 0).getTime();
+    const marcas = leerCola(yo).filter((m) => m.estado === "pendiente" || (sinSenal && m.estado === "enviada" && new Date(m.enviada_en || 0).getTime() > guardadoEn));
+    marcas.forEach((m) => {
+      if (m.tipo === "entrada") {
+        abierto = { id: `local-${m.clave}`, proyecto_id: m.proyecto_id, entrada: m.hora, proyectos: { nombre: m.proyecto_nombre, empresa_id: m.empresa_id } };
+      } else if (abierto) {
+        turnos.push({ id: `local-${m.clave}`, proyecto_id: abierto.proyecto_id, entrada: abierto.entrada, salida: m.hora, estado: "por_aprobar", proyectos: abierto.proyectos });
+        abierto = null;
+      }
+    });
+    let reg = 0; let extra = 0; let ganado = 0;
+    const porProyecto = new Map();
+    turnos.forEach((tu) => {
+      const eid = tu.proyectos?.empresa_id;
+      const m = minutosTurno(tu.entrada, tu.salida, ajustesDe(eid));
+      reg += m.reg; extra += m.extra;
+      porProyecto.set(tu.proyecto_id, (porProyecto.get(tu.proyecto_id) || 0) + m.reg + m.extra);
+      const tar = vigente(tarifas.filter((x) => !eid || x.empresa_id === eid), fechaLocal(tu.entrada), "monto_hora") || 0;
+      ganado += ((m.reg + m.extra) / 60) * tar;
+    });
+    return { abierto, reg, extra, ganado, porProyecto };
+  };
+  let estado = calcular();
+  let elegido = estado.abierto ? estado.abierto.proyecto_id : (proyectos.length === 1 ? proyectos[0].id : null);
+  try { const g = localStorage.getItem("obrapay.proyecto"); if (!estado.abierto && g && proyectos.some((p) => p.id === g)) elegido = g; } catch { /* nada */ }
 
-  let reg = 0; let extra = 0; let ganado = 0;
-  const porProyecto = new Map();
-  turnosSemana.forEach((tu) => {
-    const eid = tu.proyectos?.empresa_id;
-    const m = minutosTurno(tu.entrada, tu.salida, ajustesDe(eid));
-    reg += m.reg; extra += m.extra;
-    porProyecto.set(tu.proyecto_id, (porProyecto.get(tu.proyecto_id) || 0) + m.reg + m.extra);
-    const tar = vigente(tarifas.filter((x) => !eid || x.empresa_id === eid), fechaLocal(tu.entrada), "monto_hora") || 0;
-    ganado += ((m.reg + m.extra) / 60) * tar;
-  });
-
+  const marcasVisibles = () => leerCola(yo).filter((m) => m.estado !== "enviada" || new Date(m.enviada_en || 0).getTime() > Date.now() - 2 * 3600 * 1000);
   const pintar = () => {
+    const { abierto, reg, extra, ganado, porProyecto } = estado;
     const ahora = new Date().toISOString();
+    const cola = marcasVisibles();
+    const nPend = cola.filter((m) => m.estado === "pendiente").length;
     el.innerHTML = String(html`
+      ${sinSenal ? html`<div class="banner banner-aviso" role="status">${crudo(ICONO.alerta)}<span>${t("reloj.sin_senal")}</span></div>`
+        : nPend ? html`<div class="banner banner-aviso" role="status">${crudo(ICONO.alerta)}<span>${t("reloj.por_enviar_n", { n: nPend })}</span></div>` : ""}
       ${avisos.map((a) => html`<div class="banner banner-ok" role="status">
         ${crudo(ICONO.arriba)}<span>${crudo(t("aviso.tarifa", { antes: dinero(a.datos.antes), despues: dinero(a.datos.despues), desde: fmtDia(a.datos.desde, { day: "numeric", month: "long" }) }))}</span>
         <button type="button" class="btn-texto" data-leido="${a.id}">${t("comun.entendido")}</button></div>`)}
@@ -119,6 +161,16 @@ export async function vistaReloj(el, ctx) {
         </button>`}
         <p class="nota">${ajustesDe(proyectos.find((p) => p.id === elegido)?.empresa_id).gps_activo ? html`${crudo(ICONO.ubicacion)} ${t("reloj.gps_nota")} · ` : ""}${t("reloj.cambiar_nota")}</p>`}
 
+      ${cola.length ? html`<section class="tarjeta desglose" aria-label="${t("reloj.pendientes_t")}">
+        <h2 class="etiqueta">${t("reloj.pendientes_t")}</h2>
+        ${cola.map((m) => html`<div class="linea marca-cola">
+          <span>${m.tipo === "entrada" ? t("reloj.entrada_corta") : t("reloj.salida_corta")} · ${m.proyecto_nombre || ""} · <span class="mono">${fmtHora(m.hora)}</span></span>
+          <span class="pildora ${m.estado === "enviada" ? "pildora-ok" : m.estado === "error" ? "pildora-error" : "pildora-aviso"}">${t(`reloj.estado_${m.estado}`)}</span>
+          ${m.estado === "error" ? html`<span class="nota alerta">${m.error} · ${t("reloj.error_marca_nota")}</span><button type="button" class="btn-texto" data-descartar="${m.clave}">${t("reloj.descartar")}</button>` : ""}
+        </div>`)}
+        <p class="nota">${t("reloj.diferida_nota")}</p>
+      </section>` : ""}
+
       <section class="resumen-semana">
         <div><div class="sub">${t("reloj.semana")}</div><div class="num">${horas(reg + extra)}</div></div>
         <div><div class="sub">${t("reloj.extra")}</div><div class="num">${horas(extra)}</div></div>
@@ -130,9 +182,20 @@ export async function vistaReloj(el, ctx) {
 
   const reloj = setInterval(() => {
     const h = el.querySelector(".hora-grande");
-    if (h) h.textContent = abierto ? cronometro(abierto.entrada) : fmtHora(new Date().toISOString());
-  }, abierto ? 1000 : 20000);
+    if (h) h.textContent = estado.abierto ? cronometro(estado.abierto.entrada) : fmtHora(new Date().toISOString());
+  }, 1000);
   alSalirDeVista(() => clearInterval(reloj));
+
+  // Cuando las marcas guardadas se envían, se vuelve a cargar con los datos reales del servidor.
+  let habiaPendientes = pendientes(yo).length > 0;
+  const quitarOyente = alCambiarCola(() => {
+    const hay = pendientes(yo).length > 0;
+    if (habiaPendientes && !hay && !leerCola(yo).some((m) => m.estado === "pendiente")) { habiaPendientes = false; recargarVista(); return; }
+    habiaPendientes = hay;
+    estado = calcular();
+    pintar();
+  });
+  alSalirDeVista(quitarOyente);
 
   el.addEventListener("change", (ev) => {
     if (ev.target.name === "proyecto") {
@@ -149,17 +212,37 @@ export async function vistaReloj(el, ctx) {
       pintar();
       return;
     }
+    const descarte = ev.target.closest("[data-descartar]");
+    if (descarte) { descartar(yo, descarte.dataset.descartar); return; }
     const boton = ev.target.closest("#marcar");
     if (!boton) return;
+    const abierto = estado.abierto;
     if (abierto && !(await confirmar(t("reloj.confirmar_salida_t"), t("reloj.confirmar_salida", { proyecto: abierto.proyectos?.nombre || "" }), { boton: t("reloj.marcar_salida") }))) return;
     try {
+      let guardada = false;
       await ocupado(boton, async () => {
         let pos = { lat: null, lng: null };
         const proy = abierto ? abierto.proyectos : proyectos.find((p) => p.id === elegido);
         if (ajustesDe(proy?.empresa_id).gps_activo) pos = await ubicacion();
-        if (abierto) await api.rpc("marcar_salida", { p_lat: pos.lat, p_lng: pos.lng });
-        else await api.rpc("marcar_entrada", { p_proyecto: elegido, p_lat: pos.lat, p_lng: pos.lng });
+        const marca = crearMarca({
+          tipo: abierto ? "salida" : "entrada",
+          proyecto_id: abierto ? abierto.proyecto_id : elegido,
+          proyecto_nombre: proy?.nombre || "",
+          empresa_id: proy?.empresa_id || null,
+          lat: pos.lat, lng: pos.lng,
+        });
+        // Si ya hay marcas esperando, esta va detrás para conservar el orden.
+        if (pendientes(yo).length) { encolar(yo, marca); guardada = true; sincronizar(yo).catch(() => {}); return; }
+        try {
+          await enviarMarca(marca, false);
+        } catch (e) {
+          if (!(e instanceof ApiError && e.status === 0)) throw e;
+          // Sin señal: se guarda con la hora de ahora y la misma clave (si el servidor la recibió, no se duplica).
+          encolar(yo, marca);
+          guardada = true;
+        }
       });
+      if (guardada) { aviso(t("reloj.guardada_sin_senal"), "info"); return; }
       aviso(abierto ? t("reloj.salida_ok") : t("reloj.entrada_ok"));
       recargarVista();
     } catch (e) { aviso(mensajeError(e), "error"); }

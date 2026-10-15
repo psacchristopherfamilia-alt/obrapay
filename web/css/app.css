@@ -330,3 +330,8 @@ dialog.modal[open] { animation: entra .18s ease-out; }
   .recibo-datos span { display: block; }
   .recibo-neto { background: #DCF1E4; color: #17633A; padding: 10px 12px; border-radius: 8px; font-size: 18px !important; }
 }
+
+/* Marcas guardadas en el teléfono (modo sin conexión) */
+.marca-cola { flex-wrap: wrap; align-items: center; }
+.marca-cola .nota { flex-basis: 100%; }
+.pildora-error { background: var(--arcilla-suave); color: var(--arcilla); }

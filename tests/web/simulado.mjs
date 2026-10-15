@@ -106,6 +106,7 @@ const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", dat
 // ---------------------------------------------------------------------------
 // Supabase simulado
 // ---------------------------------------------------------------------------
+const RED = { caido: false }; // true = sin señal: todas las llamadas a Supabase fallan
 function simulador(quien, llamadas) {
   const filtrar = (filas, qs) => {
     const p = new URLSearchParams(qs);
@@ -202,6 +203,7 @@ function simulador(quien, llamadas) {
     proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
+    if (RED.caido) return route.abort("internetdisconnected");
     const req = route.request();
     const url = new URL(req.url());
     const ruta = url.pathname;
@@ -245,7 +247,7 @@ const RECORRIDOS = [
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
-  const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, timezoneId: "Asia/Tokyo", locale: "es-US" });
+  const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, timezoneId: "Asia/Tokyo", locale: "es-US", serviceWorkers: "block" });
   await ctx.addInitScript(([l, uid]) => {
     if (sessionStorage.getItem("prueba.iniciada")) return;
     sessionStorage.setItem("prueba.iniciada", "1");
@@ -339,6 +341,35 @@ await flujo("entrar y marcar entrada", P.juan, 390, async (pg, ll) => {
   await pg.waitForTimeout(200);
   esperar(ll.some((x) => x.metodo === "PATCH" && x.ruta.endsWith("/notificaciones")), "no marcó el aviso como leído");
 });
+
+await flujo("marcar sin señal guarda la marca y la envía al volver la conexión", P.juan, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/reloj`);
+  await pg.waitForSelector("#marcar");
+  await pg.click("text=Villa Grace Bay");
+  RED.caido = true;
+  await pg.click("#marcar");
+  await pg.waitForSelector(".marca-cola");
+  const cola = await pg.evaluate((uid) => JSON.parse(localStorage.getItem(`obrapay.cola.${uid}`)), P.juan.id);
+  esperar(cola.length === 1 && cola[0].tipo === "entrada" && cola[0].estado === "pendiente" && cola[0].clave && cola[0].hora, "la marca no quedó guardada en el teléfono");
+  esperar((await pg.innerText(".reloj-tarjeta")).toLowerCase().includes("trabajando ahora"), "no muestra el turno abierto con la marca guardada");
+  esperar((await pg.innerText("#vista")).includes("por enviar"), "no muestra la marca como por enviar");
+  // Recargar la app sin señal: abre con los datos guardados, no cierra la sesión.
+  await pg.reload();
+  await pg.waitForSelector(".reloj-tarjeta", { timeout: 8000 });
+  esperar((await pg.innerText("#vista")).includes("Sin señal"), "sin señal no avisa que muestra datos guardados");
+  esperar((await pg.innerText(".reloj-tarjeta")).toLowerCase().includes("trabajando ahora"), "al recargar sin señal se perdió la marca guardada");
+  esperar(await pg.evaluate(() => !!localStorage.getItem("obrapay.sesion")), "se cerró la sesión por falta de señal");
+  // Vuelve la señal: se envía con su hora y su clave.
+  RED.caido = false;
+  await pg.evaluate(() => window.dispatchEvent(new Event("online")));
+  await pg.waitForFunction(() => document.body.innerText.includes("enviada") || !document.querySelector(".marca-cola"), null, { timeout: 8000 });
+  await pg.waitForTimeout(300);
+  const env = ll.filter((x) => x.ruta.endsWith("/marcar_entrada")).pop();
+  esperar(env && env.cuerpo.p_clave === cola[0].clave && env.cuerpo.p_hora === cola[0].hora && env.cuerpo.p_proyecto === id("f1"), "no envió la marca con su clave y su hora real");
+  const despues = await pg.evaluate((uid) => JSON.parse(localStorage.getItem(`obrapay.cola.${uid}`)), P.juan.id);
+  esperar(despues.every((x) => x.estado === "enviada"), "la marca no quedó como enviada");
+});
+RED.caido = false;
 
 await flujo("cambio de contraseña obligatorio", P.nuevo, 390, async (pg, ll) => {
   await pg.goto(BASE);

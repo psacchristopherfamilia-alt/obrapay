@@ -42,6 +42,7 @@ async function pedir(ruta, { method = "GET", body, auth = true, headers = {} } =
   try {
     r = await fetch(SUPABASE_URL + ruta, {
       method, headers: h, body: body === undefined ? undefined : JSON.stringify(body),
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(25000) : undefined,
     });
   } catch {
     throw new ApiError("sin_conexion", 0);
@@ -69,7 +70,8 @@ async function asegurarToken() {
         });
         guardarSesion(normalizar(d));
       } catch (e) {
-        guardarSesion(null);
+        // Sin señal no se pierde la sesión: se vuelve a intentar cuando haya conexión.
+        if (!(e instanceof ApiError && e.status === 0)) guardarSesion(null);
         throw e;
       }
     })().finally(() => { refrescando = null; });
