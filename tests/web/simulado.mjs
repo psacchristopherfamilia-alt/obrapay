@@ -125,8 +125,8 @@ function simulador(quien, llamadas) {
     mis_ajustes_empresas: () => MIS_EMPRESAS.map((e) => ({ empresa_id: e.id, zona_horaria: EMP.zona_horaria, hora_extra_desde: "17:00", almuerzo_inicio: "12:00", almuerzo_fin: "13:00", gps_activo: false, gps_modo: "marcar" })),
     elegir_empresa: () => null,
     mi_pago: () => [
-      { empresa_id: EMP2.id, empresa: EMP2.nombre, semana_id: id("t1"), estado_semana: "cerrada", minutos_reg: 240, minutos_extra: 0, tarifa: 18, bruto: 72, seguro: 6.12, prestamo: 10, neto: 55.88, proyectos: [{ proyecto: "Torre Sur", minutos: 240, bruto: 72 }] },
-      { empresa_id: EMP.id, empresa: EMP.nombre, semana_id: id("s1"), estado_semana: "cerrada", minutos_reg: 120, minutos_extra: 0, tarifa: 20, bruto: 40, seguro: 3.4, prestamo: 0, neto: 36.6, proyectos: [{ proyecto: "Villa Grace Bay", minutos: 120, bruto: 40 }] }],
+      { empresa_id: EMP2.id, empresa: EMP2.nombre, semana_id: id("t1"), estado_semana: "cerrada", minutos_reg: 240, minutos_extra: 0, tarifa: 18, bruto: 72, seguro: 6.12, prestamo: 10, neto: 55.88, proyectos: [{ proyecto: "Torre Sur", minutos: 240, bruto: 72 }], nib_empleado: 3.96, nhip_empleado: 2.16, nib_empleador: 4.68, nhip_empleador: 2.16 },
+      { empresa_id: EMP.id, empresa: EMP.nombre, semana_id: id("s1"), estado_semana: "cerrada", minutos_reg: 120, minutos_extra: 0, tarifa: 20, bruto: 40, seguro: 3.4, prestamo: 0, neto: 36.6, proyectos: [{ proyecto: "Villa Grace Bay", minutos: 120, bruto: 40 }], nib_empleado: 2.2, nhip_empleado: 1.2, nib_empleador: 2.6, nhip_empleador: 1.2 }],
     resumen_empresas: () => [
       { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: id("g1"), proyecto: "Torre Sur", concepto: "mano_obra", monto: 4100 },
       { empresa_id: EMP2.id, empresa: EMP2.nombre, proyecto_id: null, proyecto: null, concepto: "nib_empleador", monto: 420 },
@@ -505,6 +505,13 @@ await flujo("trabajador en dos compañías ve un pago por compañía", P.juan, 3
   const txt = await pg.innerText("#vista");
   esperar(txt.includes("$92.48"), "no suma el neto de las dos compañías");
   esperar(txt.includes("Current Ltd") && txt.includes("$55.88") && txt.includes("$36.60"), "falta el bloque de cada compañía");
+  esperar((await pg.locator("#recibo-pdf").count()) === 1, "falta el botón del recibo");
+  const rec2 = await pg.locator("#recibo-imp").evaluate((n) => n.textContent);
+  esperar(rec2.includes("Torre Sur") && rec2.includes("−$3.96") && rec2.includes("−$2.16") && rec2.includes("$55.88"), "el recibo no trae NIB, NHIP y neto por separado");
+  esperar(rec2.includes("$4.68"), "el recibo no muestra el aporte del patrón");
+  await pg.evaluate(() => document.body.classList.add("imp-recibo"));
+  await pg.pdf({ path: join(CAPTURAS, "recibo-pago.pdf"), format: "Letter" });
+  await pg.evaluate(() => document.body.classList.remove("imp-recibo"));
 });
 
 await flujo("trabajador con dos compañías marca en cualquiera sin cambiar de compañía", P.juan, 390, async (pg, ll) => {

@@ -230,6 +230,47 @@ export async function vistaMisHoras(el, ctx) {
 // ---------------------------------------------------------------------------
 // Mi pago
 // ---------------------------------------------------------------------------
+// Recibo de pago imprimible (se guarda como PDF desde el diálogo de impresión del teléfono o la computadora).
+const redondo = (n) => Math.round(Number(n || 0) * 100) / 100;
+function recibo(f, semana, nombre) {
+  const reg = redondo((f.minutos_reg / 60) * f.tarifa);
+  const extra = redondo(f.bruto - reg);
+  const nib = Number(f.nib_empleado || 0), nhip = Number(f.nhip_empleado || 0);
+  const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const estado = f.estado_semana === "abierta" ? t("recibo.provisional") : f.estado_semana === "cerrada" ? t("recibo.cerrada") : t("recibo.pagada");
+  return html`
+    <article class="recibo-hoja">
+      <header class="recibo-cab">
+        <div><div class="recibo-emp">${f.empresa}</div><div class="sub">${t("recibo.titulo")}</div></div>
+        <div class="recibo-estado">${estado}</div>
+      </header>
+      <div class="recibo-datos">
+        <div><span class="sub">${t("recibo.trabajador")}</span><b>${nombre}</b></div>
+        <div><span class="sub">${t("comun.semana")}</span><b>${fmtSemana(semana)}</b></div>
+        <div><span class="sub">${t("recibo.fecha_pago")}</span><b>${viernes}</b></div>
+      </div>
+      <section class="desglose">
+        <h2 class="etiqueta">${t("recibo.horas")}</h2>
+        <div class="linea"><span>${t("recibo.normales", { h: horas(f.minutos_reg), tarifa: dinero(f.tarifa) })}</span><span class="mono">${dinero(reg)}</span></div>
+        <div class="linea"><span>${t("recibo.extra", { h: horas(f.minutos_extra), tarifa: dinero(f.tarifa) })}</span><span class="mono">${dinero(extra)}</span></div>
+        <div class="linea fuerte"><span>${t("pago.bruto")}</span><span class="mono">${dinero(f.bruto)}</span></div>
+      </section>
+      <section class="desglose">
+        <h2 class="etiqueta">${t("recibo.descuentos")}</h2>
+        <div class="linea"><span>NIB</span><span class="mono">−${dinero(nib)}</span></div>
+        <div class="linea"><span>NHIP</span><span class="mono">−${dinero(nhip)}</span></div>
+        <div class="linea"><span>${t("pago.prestamo")}</span><span class="mono">−${dinero(f.prestamo)}</span></div>
+      </section>
+      <div class="linea total recibo-neto"><span>${t("recibo.neto")}</span><span class="mono">${dinero(f.neto)}</span></div>
+      ${f.proyectos.length ? html`<section class="desglose">
+        <h2 class="etiqueta">${t("pago.por_proyecto")}</h2>
+        ${f.proyectos.map((p) => html`<div class="linea"><span>${p.proyecto} · ${horas(p.minutos)}</span><span class="mono">${dinero(p.bruto)}</span></div>`)}
+      </section>` : ""}
+      <p class="nota">${t("recibo.aporte", { nib: dinero(f.nib_empleador || 0), nhip: dinero(f.nhip_empleador || 0) })}</p>
+      ${f.estado_semana === "abierta" ? html`<p class="nota">${t("recibo.nota_provisional")}</p>` : ""}
+    </article>`;
+}
+
 export async function vistaMiPago(el, ctx) {
   const yo = ctx.perfil.id;
   const todas = await listaSemanas(52);
@@ -287,8 +328,15 @@ export async function vistaMiPago(el, ctx) {
         <h2 class="etiqueta">${t("pago.prestamos")}</h2>
         ${activos.map((p) => html`<div class="linea"><span>${multi ? `${nombreEmpresa(p.empresa_id)} · ` : ""}${t("pago.prestamo_de", { monto: dinero(p.monto_total), fecha: fmtDia(p.fecha, { day: "numeric", month: "short" }) })}</span><span class="mono">${t("pago.saldo", { saldo: dinero(p.saldo) })}</span></div>`)}
       </section>` : ""}
+      ${filas.length ? html`<button type="button" id="recibo-pdf" class="btn btn-sec">${t("recibo.descargar")}</button>` : ""}
       <p class="nota">${t("pago.nota")}</p>
+      <div id="recibo-imp" class="solo-impresion">${filas.map((f) => recibo(f, semana, ctx.perfil.nombre))}</div>
       ${multi ? html`<p class="nota">${t("pago.cia_nota")}</p>` : ""}`);
+    el.querySelector("#recibo-pdf")?.addEventListener("click", () => {
+      document.body.classList.add("imp-recibo");
+      window.addEventListener("afterprint", () => document.body.classList.remove("imp-recibo"), { once: true });
+      window.print();
+    });
     el.querySelector("#semana").addEventListener("change", (ev) => {
       semana = unicas.find((s) => s.id === ev.target.value);
       cargar().catch((e) => aviso(mensajeError(e), "error"));

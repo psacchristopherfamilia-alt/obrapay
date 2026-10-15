@@ -314,3 +314,19 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .avisos-admin { display: grid; gap: 8px; margin-bottom: 16px; }
 .avisos-admin a { color: inherit; text-decoration: none; }
 .avisos-admin a:hover { text-decoration: underline; }
+
+/* Recibo de pago: solo se ve al imprimir o guardar como PDF */
+.solo-impresion { display: none; }
+@media print {
+  body.imp-recibo * { visibility: hidden; }
+  body.imp-recibo #recibo-imp, body.imp-recibo #recibo-imp * { visibility: visible; }
+  body.imp-recibo #recibo-imp { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+  .recibo-hoja { page-break-after: always; padding: 24px; color: #18221F; font-family: var(--sans); max-width: 640px; margin: 0 auto; display: grid; gap: 14px; }
+  .recibo-hoja:last-child { page-break-after: auto; }
+  .recibo-cab { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0F6468; padding-bottom: 10px; }
+  .recibo-emp { font-family: var(--titulo); font-size: 28px; font-weight: 700; text-transform: uppercase; }
+  .recibo-estado { font-size: 12px; font-weight: 600; border: 1px solid #0F6468; color: #0F6468; padding: 3px 10px; border-radius: 99px; }
+  .recibo-datos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 13px; }
+  .recibo-datos span { display: block; }
+  .recibo-neto { background: #DCF1E4; color: #17633A; padding: 10px 12px; border-radius: 8px; font-size: 18px !important; }
+}
