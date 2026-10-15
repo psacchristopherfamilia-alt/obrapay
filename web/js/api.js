@@ -110,6 +110,26 @@ export const api = {
     method: "PATCH", body: cambios, headers: { Prefer: "return=representation" },
   }),
   quitar: (tabla, qs) => pedir(`/rest/v1/${tabla}?${qs}`, { method: "DELETE" }),
+  // Archivos privados (Supabase Storage): se suben con la sesión y se abren con un enlace firmado de 5 minutos.
+  async subirArchivo(deposito, ruta, archivo) {
+    await asegurarToken();
+    let r;
+    try {
+      r = await fetch(`${SUPABASE_URL}/storage/v1/object/${deposito}/${ruta}`, {
+        method: "POST", body: archivo,
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${sesion.access_token}`, "Content-Type": archivo.type || "application/octet-stream" },
+      });
+    } catch { throw new ApiError("sin_conexion", 0); }
+    if (!r.ok) {
+      let d = null; try { d = await r.json(); } catch { /* nada */ }
+      throw new ApiError(String((d && (d.message || d.error)) || `HTTP ${r.status}`), r.status);
+    }
+    return ruta;
+  },
+  async urlArchivo(deposito, ruta) {
+    const d = await pedir(`/storage/v1/object/sign/${deposito}/${ruta}`, { method: "POST", body: { expiresIn: 300 } });
+    return `${SUPABASE_URL}/storage/v1${d.signedURL}`;
+  },
   funcion: (nombre, cuerpo) => pedir(`/functions/v1/${nombre}`, { method: "POST", body: cuerpo }),
   enc,
 };

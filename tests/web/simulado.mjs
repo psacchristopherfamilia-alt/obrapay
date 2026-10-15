@@ -100,6 +100,13 @@ const AVISOS_ADMIN = [
   { id: id("na2"), perfil_id: P.admin.id, tipo: "semana_por_cerrar", datos: { inicio: "2026-10-08", fin: "2026-10-14" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
   { id: id("na3"), perfil_id: P.admin.id, tipo: "turnos_sin_aprobar", datos: { n: 3 }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
   { id: id("na4"), perfil_id: P.admin.id, tipo: "tope_seguro", datos: { agencia: "NIB", nombre: "Juan <b>Pérez</b>" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
+  { id: id("na5"), perfil_id: P.admin.id, tipo: "documento_por_vencer", datos: { documento: "d1", doc_tipo: "permiso_trabajo", quien: "Marie <i>Joseph</i>", vence: "2026-11-05", dias: 20 }, leida: false, creado_en: "2026-10-15T13:00:00Z" },
+];
+const sumar = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+const DOCUMENTOS = [
+  { id: id("d1"), empresa_id: EMP.id, tipo: "permiso_trabajo", perfil_id: P.juan.id, titulo: null, numero: "WP-2024-01877", vence: sumar(20), archivo_path: `${EMP.id}/a.pdf`, archivo_nombre: "permiso_juan.pdf", activo: true },
+  { id: id("d2"), empresa_id: EMP.id, tipo: "seguro_vehiculo", perfil_id: null, titulo: "Toyota Hilux · TCI 4821", numero: "POL-77120", vence: sumar(-4), archivo_path: null, archivo_nombre: null, activo: true },
+  { id: id("d3"), empresa_id: EMP.id, tipo: "licencia_conducir", perfil_id: P.marie.id, titulo: null, numero: "DL-1", vence: sumar(200), archivo_path: null, archivo_nombre: null, activo: true },
 ];
 const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", datos: { antes: 17, despues: 18, desde: "2026-10-01" }, leida: false, creado_en: "2026-10-01T12:00:00Z" }];
 
@@ -201,6 +208,7 @@ function simulador(quien, llamadas) {
     gastos: () => [
       { id: id("x1"), proyecto_id: id("f1"), categoria: "materiales", monto: 120, fecha: "2026-10-14", descripcion: "Tubería PVC", proveedor: "Ferretería Island", anulado: false, anulado_motivo: null, proyectos: { nombre: "Villa Grace Bay" } },
       { id: id("x2"), proyecto_id: null, categoria: "poliza", monto: 900, fecha: "2026-10-01", descripcion: null, proveedor: "Aseguradora", anulado: true, anulado_motivo: "duplicado", proyectos: null }],
+    documentos: () => DOCUMENTOS,
     proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
@@ -242,9 +250,9 @@ const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "contador", "ajustes"], idiomas: ["es", "en"] },
-  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "contador"], idiomas: ["es", "en", "ht"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -417,6 +425,53 @@ await flujo("admin descarga recibos de todos o de un trabajador", P.admin, 1360,
   esperar((await pg.locator("#recibo-imp").evaluate((n) => n.textContent)).includes("Marie Joseph"), "no es el recibo de Marie");
 });
 
+await flujo("admin agrega, renueva y quita documentos", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/vencimientos`);
+  await pg.waitForSelector(`[data-doc="${id("d1")}"]`);
+  const lista = await pg.innerText("#vista");
+  esperar(lista.includes("Juan Pérez") && lista.includes("Toyota Hilux") && lista.includes("hace 4 d"), "no lista los documentos con sus días");
+  esperar((await pg.innerText(`[data-doc="${id("d2")}"]`)).toLowerCase().includes("vencido"), "el seguro vencido no se marca como vencido");
+  esperar((await pg.innerText(`[data-doc="${id("d1")}"]`)).toLowerCase().includes("renovar"), "el permiso a 20 días debe estar por renovar");
+  esperar((await pg.innerText(`[data-doc="${id("d3")}"]`)).toLowerCase().includes("vigente"), "la licencia a 200 días debe estar vigente");
+  await pg.click(`[data-doc="${id("d1")}"]`);
+  await pg.waitForSelector("#doc-detalle");
+  esperar((await pg.innerText("#doc-detalle")).includes("permiso_juan.pdf"), "el detalle no muestra el archivo");
+  // agregar
+  await pg.click("#agregar");
+  await pg.selectOption("#dc-tipo", "seguro_vehiculo");
+  await pg.fill("#dc-titulo", "Ford Transit · TCI 3310");
+  await pg.fill("#dc-vence", "2027-03-01");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/guardar_documento"));
+  esperar(g && g.cuerpo.p_tipo === "seguro_vehiculo" && g.cuerpo.p_titulo === "Ford Transit · TCI 3310" && g.cuerpo.p_vence === "2027-03-01" && g.cuerpo.p_perfil === null, "datos mal enviados a guardar_documento");
+  // validar
+  await pg.click("#agregar");
+  await pg.selectOption("#dc-tipo", "permiso_trabajo");
+  await pg.fill("#dc-vence", "2027-03-01");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar((await pg.locator("dialog .error-form").innerText()).length > 0, "no pidió el trabajador del permiso");
+  esperar(ll.filter((x) => x.ruta.endsWith("/guardar_documento")).length === 1, "envió un permiso sin trabajador");
+  await pg.click("dialog [data-cerrar]");
+  // renovar
+  await pg.click(`[data-doc="${id("d1")}"]`);
+  await pg.click('[data-accion="renovar"]');
+  await pg.fill("#rn-vence", sumar(400));
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const r = ll.find((x) => x.ruta.endsWith("/renovar_documento"));
+  esperar(r && r.cuerpo.p_id === id("d1") && r.cuerpo.p_vence === sumar(400), "no llamó a renovar_documento");
+});
+
+await flujo("dueño ve los vencimientos sin poder editarlos", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/vencimientos`);
+  await pg.waitForSelector(`[data-doc="${id("d1")}"]`);
+  esperar((await pg.locator("#agregar").count()) === 0, "el dueño ve el botón de agregar");
+  await pg.click(`[data-doc="${id("d1")}"]`);
+  esperar((await pg.locator('[data-accion="renovar"], [data-accion="quitar"]').count()) === 0, "el dueño ve botones de edición");
+});
+
 await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/trabajadores`);
   await pg.click("#nuevo");
@@ -521,12 +576,12 @@ await flujo("admin ve y descarta sus avisos", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/nomina`);
   await pg.waitForSelector(".avisos-admin");
   const txt = await pg.innerText(".avisos-admin");
-  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB"), "faltan avisos del admin");
+  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB") && txt.includes("Permiso de trabajo · Marie") && txt.includes("vence en 20 días"), "faltan avisos del admin");
   esperar(!(await pg.innerHTML(".avisos-admin")).includes("<b>"), "el nombre del aviso no se escapó");
   await pg.click(`[data-leido="${id("na3")}"]`);
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.metodo === "PATCH" && x.ruta.endsWith("/notificaciones")), "no marcó el aviso como leído");
-  esperar((await pg.locator("[data-aviso]").count()) === 3, "no quitó el aviso descartado");
+  esperar((await pg.locator("[data-aviso]").count()) === 4, "no quitó el aviso descartado");
 });
 
 await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {

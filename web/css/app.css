@@ -363,6 +363,21 @@ dialog.modal[open] { animation: entra .18s ease-out; }
   .rec-pie { display: flex; justify-content: space-between; gap: 16px; color: #5E6D68; font-size: 11px; border-top: 1px solid #D9E1DE; padding-top: 10px; }
 }
 
+/* Vencimientos de documentos */
+.doc-grupo { display: grid; gap: 8px; }
+.doc-item { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; text-align: left; width: 100%; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.doc-item:hover, .doc-item[aria-pressed="true"] { border-color: var(--acento); }
+.doc-item.doc-error { border-left: 4px solid var(--arcilla); }
+.doc-item.doc-aviso { border-left: 4px solid var(--ambar); }
+.doc-dias { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.doc-detalle { display: grid; gap: 12px; border-color: var(--acento); }
+.doc-nombre { margin: 2px 0 0; font-size: 18px; }
+.doc-datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.doc-datos .sub { display: block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.doc-archivo { display: flex; align-items: center; gap: 12px; border: 1px dashed var(--borde); border-radius: 10px; padding: 10px 12px; }
+.doc-ext { width: 34px; height: 42px; display: grid; place-items: center; background: var(--acento-suave); color: var(--acento); border-radius: 4px; font: 600 10px var(--mono); flex: none; }
+.doc-arch-txt { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
 /* Marcas guardadas en el teléfono (modo sin conexión) */
 .marca-cola { flex-wrap: wrap; align-items: center; }
 .marca-cola .nota { flex-basis: 100%; }

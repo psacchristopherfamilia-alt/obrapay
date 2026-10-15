@@ -4,7 +4,8 @@ import { api } from "./api.js";
 import { t } from "./i18n.js";
 import { html, esc, crudo, dinero, fmtDia, ICONO } from "./ui.js";
 
-const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro"];
+const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro", "documento_por_vencer"];
+const DOC_TIPOS = { permiso_trabajo: "venc.t_permiso", licencia_construccion: "venc.t_construccion", licencia_conducir: "venc.t_conducir", seguro_vehiculo: "venc.t_seguro" };
 const fecha = (d) => fmtDia(d, { day: "numeric", month: "short" });
 
 function texto(a) {
@@ -16,6 +17,11 @@ function texto(a) {
     case "semana_por_cerrar": return [t("aviso.semana_cierre", { inicio: fecha(d.inicio), fin: fecha(d.fin) }), "nomina"];
     case "turnos_sin_aprobar": return [t("aviso.turnos_sin_aprobar", { n: d.n }), "turnos"];
     case "tope_seguro": return [t("aviso.tope_seguro", { nombre: esc(d.nombre), agencia: d.agencia }), "seguros"];
+    case "documento_por_vencer": {
+      const n = Number(d.dias);
+      const x = { doc: t(DOC_TIPOS[d.doc_tipo] || "venc.titulo"), quien: esc(d.quien), n: Math.abs(n), fecha: fecha(d.vence) };
+      return [t(n < 0 ? "aviso.doc_vencido" : n === 0 ? "aviso.doc_hoy" : n === 1 ? "aviso.doc_manana" : "aviso.doc_vence", x), "vencimientos"];
+    }
     default: return null;
   }
 }
@@ -24,7 +30,7 @@ export async function pintarAvisos(el, ctx) {
   if (!ctx.roles.includes("admin")) return;
   let lista = [];
   try {
-    lista = await api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${ctx.perfil.id}&leida=eq.false&order=creado_en.desc&limit=12`);
+    lista = await api.sel("notificaciones", `select=id,tipo,datos,creado_en&perfil_id=eq.${ctx.perfil.id}&leida=eq.false&order=creado_en.desc&limit=30`);
   } catch { return; }
   lista = lista.filter((a) => TIPOS.includes(a.tipo));
   if (!lista.length) return;
