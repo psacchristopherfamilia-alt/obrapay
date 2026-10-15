@@ -63,7 +63,7 @@ const turno = (tid, perfil, proy, entrada, salida, estado, extra = {}) => ({
   perfiles: { nombre: perfil.nombre, usuario: perfil.usuario }, proyectos: nombreProy(proy), ...extra,
 });
 const TURNOS = [
-  turno("t1", P.juan, id("f1"), "2026-10-08T11:00:00Z", "2026-10-08T22:10:00Z", "por_aprobar"),
+  turno("t1", P.juan, id("f1"), "2026-10-08T11:00:00Z", "2026-10-08T22:10:00Z", "por_aprobar", { marca_diferida: true }),
   turno("t2", P.marie, id("f2"), "2026-10-08T11:15:00Z", "2026-10-08T19:30:00Z", "por_aprobar"),
   turno("t3", P.pedro, id("f1"), "2026-10-08T10:58:00Z", "2026-10-09T03:00:00Z", "por_aprobar", { cierre_automatico: true }),
   turno("t4", P.juan, id("f1"), "2026-10-09T11:00:00Z", "2026-10-09T19:00:00Z", "aprobado"),
@@ -163,6 +163,7 @@ function simulador(quien, llamadas) {
       { creado_en: "2026-10-01T12:00:00Z", tipo: "creada", nota: null, por: "Administración", detalle: {} }],
     nomina_semana: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA[a.p_semana] : NOMINA[a.p_semana].filter((n) => n.perfil_id === quien.id)),
     nomina_semana_proyectos: (a) => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? NOMINA_PROY[a.p_semana] : NOMINA_PROY[a.p_semana].filter((n) => n.perfil_id === quien.id)),
+    nomina_semana_estatutario: (a) => NOMINA[a.p_semana].map((n) => ({ perfil_id: n.perfil_id, nombre: n.nombre, bruto: n.bruto, nib_empleado: 10.11, nhip_empleado: 5.55, nib_empleador: 12.34, nhip_empleador: 5.55, estado_semana: n.estado_semana })),
     reporte_mensual: () => [{ perfil_id: P.juan.id, nombre: "Juan Pérez", semanas: 2, minutos_reg: 4800, minutos_extra: 400, bruto: 1600, seguro: 48, prestamo: 250, neto: 1302 }],
     reporte_remesa: () => [
       { perfil_id: P.juan.id, nombre: "Juan Pérez", numero_nib: "NIB-1", numero_nhip: null, base_nib: 1656, nib_empleado: 91.08, nib_empleador: 107.64, nib_total: 198.72,
@@ -389,6 +390,7 @@ await flujo("cambio de contraseña obligatorio", P.nuevo, 390, async (pg, ll) =>
 await flujo("supervisor corrige turno olvidado", P.ramon, 390, async (pg, ll) => {
   await pg.goto(`${BASE}#/aprobar`);
   await pg.waitForSelector(`[data-corregir="${id("t3")}"]`);
+  esperar((await pg.innerText(`[data-turno="${id("t1")}"]`)).includes("envió tarde") || (await pg.innerText(`[data-turno="${id("t1")}"]`)).includes("se envió tarde"), "no marca el turno enviado tarde");
   esperar(!(await pg.$(`[data-aprobar-todo]`)) || !(await pg.getAttribute("[data-aprobar-todo]", "data-aprobar-todo")).includes(id("t3")), "incluyó el turno con alerta en aprobar todo");
   await pg.click(`[data-corregir="${id("t3")}"]`);
   await pg.fill("#c-salida", "2026-10-08T16:00");
@@ -399,6 +401,20 @@ await flujo("supervisor corrige turno olvidado", P.ramon, 390, async (pg, ll) =>
   esperar(c, "no llamó a corregir_turno");
   esperar(c.cuerpo.p_salida === "2026-10-08T20:00:00.000Z", `salida mal convertida a UTC: ${c.cuerpo.p_salida}`);
   esperar(c.cuerpo.p_entrada === "2026-10-08T10:58:00.000Z", `entrada mal convertida: ${c.cuerpo.p_entrada}`);
+});
+
+await flujo("admin descarga recibos de todos o de un trabajador", P.admin, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/nomina`);
+  await pg.waitForSelector("#recibos-todos:not([disabled])");
+  await pg.click("#recibos-todos");
+  await pg.waitForSelector("#recibo-imp .recibo-hoja", { state: "attached" });
+  esperar((await pg.locator("#recibo-imp .recibo-hoja").count()) === 2, "debe haber un recibo por trabajador");
+  const todos = await pg.locator("#recibo-imp").evaluate((n) => n.textContent);
+  esperar(todos.includes("Juan Pérez") && todos.includes("Marie Joseph") && todos.includes("Detalle por día y lugar") && todos.includes("−$10.11") && todos.includes("−$5.55"), "faltan datos en los recibos del admin");
+  await pg.click(`[data-recibo="${P.marie.id}"]`);
+  await pg.waitForTimeout(300);
+  esperar((await pg.locator("#recibo-imp .recibo-hoja").count()) === 1, "el recibo individual debe ser uno solo");
+  esperar((await pg.locator("#recibo-imp").evaluate((n) => n.textContent)).includes("Marie Joseph"), "no es el recibo de Marie");
 });
 
 await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {

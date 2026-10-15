@@ -316,7 +316,7 @@ export async function vistaMisHoras(el, ctx) {
 // Recibo de pago imprimible (se guarda como PDF desde el diálogo de impresión del teléfono o la computadora).
 const redondo = (n) => Math.round(Number(n || 0) * 100) / 100;
 // Un solo recibo por semana, con todas las compañías: días, lugares y horas por lugar.
-function recibo(filas, turnos, semana, ctx) {
+export function recibo(filas, turnos, semana, ctx, trab = ctx.perfil) {
   const multi = filas.length > 1;
   const ajustesDe = (id) => ctx.ajustes[id] || ctx.empresa;
   const tarifaDe = (id) => Number(filas.find((f) => f.empresa_id === id)?.tarifa || 0);
@@ -337,7 +337,7 @@ function recibo(filas, turnos, semana, ctx) {
   const estados = [...new Set(filas.map((f) => f.estado_semana))];
   const estado = estados.includes("abierta") ? t("recibo.provisional") : estados.every((e) => e === "pagada") ? t("recibo.pagada") : t("recibo.cerrada");
   const provisional = estados.includes("abierta");
-  const numero = `RP-${String(semana.inicio).replace(/-/g, "")}-${String(ctx.perfil.id).slice(0, 4).toUpperCase()}`;
+  const numero = `RP-${String(semana.inicio).replace(/-/g, "")}-${String(trab.id).slice(0, 4).toUpperCase()}`;
   const hoy = fmtDia(hoyLocal(), { day: "numeric", month: "long", year: "numeric" });
 
   // Detalle por día y lugar
@@ -397,7 +397,7 @@ function recibo(filas, turnos, semana, ctx) {
       </header>
       <div class="rec-cuerpo">
         <div class="rec-ficha">
-          <div><span class="etq">${t("recibo.trabajador")}</span><b>${ctx.perfil.nombre}</b></div>
+          <div><span class="etq">${t("recibo.trabajador")}</span><b>${trab.nombre}</b></div>
           <div><span class="etq">${t("recibo.periodo")}</span><b>${fmtSemana(semana)}</b></div>
           <div><span class="etq">${t("recibo.fecha_pago")}</span><b>${viernes}</b></div>
           <div>${multi ? html`<span class="etq">${t("recibo.companias")}</span><b>${filas.length}</b>` : html`<span class="etq">${t("recibo.tarifa_hora")}</span><b class="mono">${dinero(filas[0].tarifa)}</b>`}</div>
@@ -427,6 +427,18 @@ function recibo(filas, turnos, semana, ctx) {
         ${provisional ? html`<p class="nota">${t("recibo.nota_provisional")}</p>` : ""}
       </div>
     </article>`;
+}
+
+// Pone las hojas en un contenedor de impresión, abre el diálogo de imprimir y lo limpia al terminar.
+export function imprimirHojas(el, hojas) {
+  el.querySelector("#recibo-imp")?.remove();
+  const caja = document.createElement("div");
+  caja.id = "recibo-imp"; caja.className = "solo-impresion";
+  caja.innerHTML = hojas.map(String).join("");
+  el.appendChild(caja);
+  document.body.classList.add("imp-recibo");
+  window.addEventListener("afterprint", () => { document.body.classList.remove("imp-recibo"); caja.remove(); }, { once: true });
+  window.print();
 }
 
 export async function vistaMiPago(el, ctx) {

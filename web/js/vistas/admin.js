@@ -10,7 +10,7 @@ import {
   listaSemanas, semanaActual, semanaPorDefecto, rangoSemana, vigente, prestamosConSaldo, P_TURNO,
 } from "../datos.js";
 import { tarjetaTurno, conectarAcciones, alertasTurno } from "./supervisor.js";
-import { selectorSemana } from "./trabajador.js";
+import { selectorSemana, recibo, imprimirHojas } from "./trabajador.js";
 import { recargarVista } from "../app.js";
 
 // ---------------------------------------------------------------------------
@@ -61,7 +61,7 @@ export function barrasProyectos(porProyecto) {
     </div>`)}</div>`;
 }
 
-export function tablaNomina(d) {
+export function tablaNomina(d, { recibos = false } = {}) {
   return html`
     <div class="tabla-caja" role="region" aria-label="${t("nomina.tabla")}" tabindex="0">
       <table class="tabla">
@@ -70,7 +70,7 @@ export function tablaNomina(d) {
           <th scope="col" class="num">${t("col.tarifa")}</th><th scope="col" class="num">${t("col.horas")}</th>
           <th scope="col" class="num">${t("col.extra")}</th><th scope="col" class="num">${t("col.bruto")}</th>
           <th scope="col" class="num">${t("col.seguro")}</th><th scope="col" class="num">${t("col.prestamo")}</th>
-          <th scope="col" class="num">${t("col.neto")}</th><th scope="col">${t("col.estado")}</th>
+          <th scope="col" class="num">${t("col.neto")}</th><th scope="col">${t("col.estado")}</th>${recibos ? html`<th scope="col">${t("recibo.uno")}</th>` : ""}
         </tr></thead>
         <tbody>${d.filas.map((f) => html`<tr>
           <th scope="row">${f.nombre}</th><td>${f.oficio || ""}</td>
@@ -79,6 +79,7 @@ export function tablaNomina(d) {
           <td class="num mono rojo">${dinero(f.seguro)}</td><td class="num mono rojo">${dinero(f.prestamo)}</td>
           <td class="num mono fuerte">${dinero(f.neto)}</td>
           <td>${f.con_aprobacion_admin ? html`<span class="pildora pildora-aviso">${t("estado.con_admin")}</span>` : html`<span class="pildora pildora-ok">${t("estado.aprobado")}</span>`}</td>
+          ${recibos ? html`<td><button type="button" class="btn btn-sec btn-chico" data-recibo="${f.perfil_id}">${t("recibo.uno")}</button></td>` : ""}
         </tr>`)}</tbody>
         ${d.filas.length ? html`<tfoot><tr>
           <th scope="row">${t("col.total")}</th><td></td><td></td>
@@ -147,6 +148,28 @@ function pasosCiclo(semana) {
 // ---------------------------------------------------------------------------
 // Nómina de la semana
 // ---------------------------------------------------------------------------
+// Recibos de pago de los trabajadores de la compañía activa, en una sola impresión (una hoja por trabajador).
+async function recibosAdmin(el, ctx, semana, datos, perfilIds, boton) {
+  await ocupado(boton, async () => {
+    const { desde, hasta } = rangoSemana(semana, ctx.empresa.zona_horaria);
+    const [est, turnos] = await Promise.all([
+      api.rpc("nomina_semana_estatutario", { p_semana: semana.id }),
+      api.sel("turnos", `select=id,perfil_id,entrada,salida,estado,proyectos(nombre,empresa_id)&entrada=gte.${desde}&entrada=lt.${hasta}&order=entrada.asc`),
+    ]);
+    const hojas = datos.filas.filter((f) => perfilIds.includes(f.perfil_id)).map((f) => {
+      const e = est.find((x) => x.perfil_id === f.perfil_id) || {};
+      const fila = {
+        empresa_id: ctx.empresa.id, empresa: ctx.empresa.nombre, estado_semana: f.estado_semana,
+        minutos_reg: f.minutos_reg, minutos_extra: f.minutos_extra, tarifa: f.tarifa, bruto: f.bruto, prestamo: f.prestamo, neto: f.neto,
+        nib_empleado: e.nib_empleado, nhip_empleado: e.nhip_empleado, nib_empleador: e.nib_empleador, nhip_empleador: e.nhip_empleador,
+        proyectos: datos.proyectos.filter((p) => p.perfil_id === f.perfil_id).map((p) => ({ proyecto: p.proyecto, minutos: p.minutos_reg + p.minutos_extra, bruto: p.bruto })),
+      };
+      return recibo([fila], turnos.filter((tu) => tu.perfil_id === f.perfil_id), semana, ctx, { id: f.perfil_id, nombre: f.nombre });
+    });
+    imprimirHojas(el, hojas);
+  });
+}
+
 export async function vistaNomina(el, ctx) {
   const semanas = await listaSemanas(26);
   let semana = semanaPorDefecto(semanas);
@@ -168,13 +191,14 @@ export async function vistaNomina(el, ctx) {
           ${semana.estado === "cerrada" ? html`<button type="button" class="btn btn-sec" id="reabrir">${t("nomina.reabrir")}</button>
             <button type="button" class="btn btn-pri" id="pagada">${t("nomina.marcar_pagada")}</button>` : ""}
           <button type="button" class="btn btn-ok" id="excel" ${datos.filas.length ? "" : html`disabled`}>${crudo(ICONO.descarga)} ${t("comun.excel")}</button>
+          <button type="button" class="btn btn-sec" id="recibos-todos" ${datos.filas.length ? "" : html`disabled`}>${crudo(ICONO.descarga)} ${t("recibo.todos")}</button>
         </div>
       </div>
       ${pasosCiclo(semana)}
       ${semana.estado === "abierta" ? html`<div class="banner banner-aviso">${t("nomina.en_vivo")}</div>` : ""}
       ${kpis(datos, semana)}
       <section class="tarjeta"><h2>${t("nomina.por_trabajador")}</h2>
-        ${datos.filas.length ? tablaNomina(datos) : html`<p class="vacio">${t("nomina.vacia")}</p>`}</section>
+        ${datos.filas.length ? tablaNomina(datos, { recibos: true }) : html`<p class="vacio">${t("nomina.vacia")}</p>`}</section>
       <section class="tarjeta"><h2>${t("nomina.por_proyecto")}</h2>${barrasProyectos(datos.porProyecto)}</section>`);
   };
 
@@ -189,6 +213,8 @@ export async function vistaNomina(el, ctx) {
     if (!b) return;
     try {
       if (b.id === "excel") exportarNomina(datos, semana, ctx.empresa);
+      if (b.id === "recibos-todos") await recibosAdmin(el, ctx, semana, datos, datos.filas.map((f) => f.perfil_id), b);
+      if (b.dataset.recibo) await recibosAdmin(el, ctx, semana, datos, [b.dataset.recibo], b);
       if (b.id === "cerrar") {
         if (!(await confirmar(t("nomina.cerrar_t"), t("nomina.cerrar_txt")))) return;
         await api.rpc("cerrar_semana", { p_semana: semana.id });
@@ -234,7 +260,7 @@ export async function vistaTurnos(el, ctx) {
   let semana = semanas.find((s) => s.estado === "abierta") || semanas[0];
   let filtro = "pendientes";
   let turnos = [];
-  const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,semana_id,${P_TURNO},proyectos(nombre)`;
+  const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,semana_id,${P_TURNO},proyectos(nombre)`;
 
   const cargar = async () => {
     if (filtro === "pendientes") {

@@ -17,6 +17,7 @@ const es = {
   "comun.cerrar": "Cerrar", "comun.cancelar": "Cancelar", "comun.confirmar": "Confirmar", "comun.guardar": "Guardar",
   "comun.guardado": "Guardado", "comun.listo": "Listo", "comun.entendido": "Entendido", "comun.reintentar": "Reintentar",
   "comun.semana": "Semana", "comun.excel": "Exportar a Excel", "comun.acciones": "Acciones",
+  "recibo.todos": "Recibos (PDF)", "recibo.uno": "Recibo",
   "comun.sesion_cerrada": "Sesión cerrada",
 
   "err.conexion": "Sin conexión. Revisa el internet e inténtalo de nuevo.",
@@ -114,6 +115,7 @@ const es = {
   "pago.nota": "Las horas extra se pagan a la misma tarifa. Si algo no cuadra, habla con tu supervisor.",
 
   "turno.olvido": "Olvidó marcar salida: corrige la hora", "turno.fuera_area": "Marcó fuera del área del proyecto",
+  "turno.diferida": "Marcó sin señal y se envió tarde: revisa la hora",
   "turno.en_curso": "en curso", "turno.incluye_extra": "Incluye {extra} de horas extra",
   "turno.corregir": "Corregir", "turno.aprobar": "Aprobar", "turno.confirmar": "Confirmar",
   "turno.corregir_t": "Corregir turno de {nombre}", "turno.entrada": "Entrada", "turno.salida": "Salida",
@@ -459,6 +461,7 @@ const en = {
   "comun.cerrar": "Close", "comun.cancelar": "Cancel", "comun.confirmar": "Confirm", "comun.guardar": "Save",
   "comun.guardado": "Saved", "comun.listo": "Done", "comun.entendido": "Got it", "comun.reintentar": "Try again",
   "comun.semana": "Week", "comun.excel": "Export to Excel", "comun.acciones": "Actions",
+  "recibo.todos": "Pay stubs (PDF)", "recibo.uno": "Pay stub",
   "comun.sesion_cerrada": "Signed out",
 
   "err.conexion": "No connection. Check the internet and try again.",
@@ -556,6 +559,7 @@ const en = {
   "pago.nota": "Overtime is paid at the same rate. If something looks wrong, talk to your supervisor.",
 
   "turno.olvido": "Forgot to clock out: fix the time", "turno.fuera_area": "Clocked outside the project area",
+  "turno.diferida": "Clocked without signal and sent late: check the time",
   "turno.en_curso": "in progress", "turno.incluye_extra": "Includes {extra} of overtime",
   "turno.corregir": "Fix", "turno.aprobar": "Approve", "turno.confirmar": "Confirm",
   "turno.corregir_t": "Fix shift for {nombre}", "turno.entrada": "Clock in", "turno.salida": "Clock out",
@@ -901,6 +905,7 @@ const ht = {
   "comun.cerrar": "Fèmen", "comun.cancelar": "Anile", "comun.confirmar": "Konfime", "comun.guardar": "Anrejistre",
   "comun.guardado": "Anrejistre", "comun.listo": "Fini", "comun.entendido": "Mwen konprann", "comun.reintentar": "Eseye ankò",
   "comun.semana": "Semèn", "comun.excel": "Ekspòte nan Excel", "comun.acciones": "Aksyon",
+  "recibo.todos": "Resi peman (PDF)", "recibo.uno": "Resi",
   "comun.sesion_cerrada": "Ou soti",
 
   "err.conexion": "Pa gen koneksyon. Tcheke entènèt la epi eseye ankò.",
@@ -998,6 +1003,7 @@ const ht = {
   "pago.nota": "Èdtan siplemantè yo peye menm tarif la. Si yon bagay pa kòrèk, pale ak sipèvizè ou.",
 
   "turno.olvido": "Li bliye make sòti: korije lè a", "turno.fuera_area": "Li make andeyò zòn pwojè a",
+  "turno.diferida": "Li make san siyal epi yo voye l ta: verifye lè a",
   "turno.en_curso": "ap kouri", "turno.incluye_extra": "Gen {extra} siplemantè ladan l",
   "turno.corregir": "Korije", "turno.aprobar": "Apwouve", "turno.confirmar": "Konfime",
   "turno.corregir_t": "Korije vire {nombre}", "turno.entrada": "Antre", "turno.salida": "Sòti",

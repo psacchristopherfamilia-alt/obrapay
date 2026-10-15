@@ -8,12 +8,13 @@ import {
 import { P_TURNO } from "../datos.js";
 import { pildora } from "./trabajador.js";
 
-const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,semana_id,${P_TURNO},proyectos(nombre)`;
+const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,semana_id,${P_TURNO},proyectos(nombre)`;
 
 export function alertasTurno(tu) {
   const a = [];
   if (tu.cierre_automatico) a.push(t("turno.olvido"));
   if (tu.fuera_de_area) a.push(t("turno.fuera_area"));
+  if (tu.marca_diferida) a.push(t("turno.diferida"));
   return a;
 }
 
