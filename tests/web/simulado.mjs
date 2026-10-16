@@ -123,6 +123,11 @@ const VEHICULOS = [
   { id: id("v1"), empresa_id: EMP.id, nombre: "Toyota Hilux 01", placa: "TCI 4821", tipo: "camioneta", marca: "Toyota", modelo: "Hilux", anio: 2021, vin: "MR0FB8CD600123456", foto_path: null, foto_nombre: null, conductor_id: P.juan.id, millas: 48600, millas_en: "2026-10-14T12:00:00Z", activo: true },
   { id: id("v2"), empresa_id: EMP.id, nombre: "Ford Transit", placa: "TCI 3310", tipo: "van", marca: "Ford", modelo: "Transit", anio: 2019, vin: null, foto_path: null, foto_nombre: null, conductor_id: null, millas: 1200, millas_en: "2026-10-01T12:00:00Z", activo: true },
 ];
+const GASOLINA = [
+  { id: id("g1"), empresa_id: EMP.id, vehiculo_id: id("v1"), perfil_id: P.juan.id, fecha: sumar(-10), total: 60, millas: 48400, recibo_path: `${EMP.id}/gasolina/a.jpg`, recibo_nombre: "a.jpg", activo: true, creado_en: "2026-10-06T12:00:00Z", editado_en: null },
+  { id: id("g2"), empresa_id: EMP.id, vehiculo_id: id("v1"), perfil_id: P.juan.id, fecha: sumar(-3), total: 55, millas: 48600, recibo_path: `${EMP.id}/gasolina/b.jpg`, recibo_nombre: "b.jpg", activo: true, creado_en: "2026-10-13T12:00:00Z", editado_en: null },
+  { id: id("g3"), empresa_id: EMP.id, vehiculo_id: id("v2"), perfil_id: P.ramon.id, fecha: sumar(-1), total: 40, millas: null, recibo_path: `${EMP.id}/gasolina/c.jpg`, recibo_nombre: "c.jpg", activo: true, creado_en: "2026-10-15T12:00:00Z", editado_en: null },
+];
 const PLANES = [
   { id: id("p1"), empresa_id: EMP.id, vehiculo_id: id("v1"), nombre: "Cambio de aceite", cada_millas: 5000, cada_dias: 90, ultimo_fecha: sumar(-80), ultimo_millas: 45900, activo: true },
   { id: id("p2"), empresa_id: EMP.id, vehiculo_id: id("v1"), nombre: "Rotación de llantas", cada_millas: 5000, cada_dias: null, ultimo_fecha: sumar(-30), ultimo_millas: 44000, activo: true },
@@ -143,6 +148,7 @@ function simulador(quien, llamadas) {
       if (["select", "order", "limit"].includes(k)) continue;
       if (v.startsWith("eq.")) r = r.filter((x) => String(x[k]) === v.slice(3));
       else if (v.startsWith("neq.")) r = r.filter((x) => String(x[k]) !== v.slice(4));
+      else if (v.startsWith("gte.")) r = r.filter((x) => String(x[k]) >= v.slice(4));
       else if (v === "is.null") r = r.filter((x) => x[k] === null || x[k] === undefined);
       else if (v.startsWith("in.(")) { const set = v.slice(4, -1).split(","); r = r.filter((x) => set.includes(String(x[k]))); }
     }
@@ -236,6 +242,7 @@ function simulador(quien, llamadas) {
     vehiculos: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? VEHICULOS : VEHICULOS.filter((x) => x.conductor_id === quien.id)),
     vehiculo_planes: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? PLANES : PLANES.filter((x) => VEHICULOS.find((v) => v.id === x.vehiculo_id)?.conductor_id === quien.id)),
     vehiculo_servicios: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? SERVICIOS : []),
+    vehiculo_gasolina: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? GASOLINA : GASOLINA.filter((x) => x.perfil_id === quien.id)),
     proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
@@ -243,7 +250,7 @@ function simulador(quien, llamadas) {
     const req = route.request();
     const url = new URL(req.url());
     const ruta = url.pathname;
-    const cuerpo = req.postData() ? JSON.parse(req.postData()) : null;
+    let cuerpo = null; try { cuerpo = req.postData() ? JSON.parse(req.postData()) : null; } catch { cuerpo = null; }
     const json = (status, datos) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(datos), headers: { "access-control-allow-origin": "*" } });
     if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
     llamadas.push({ metodo: req.method(), ruta, qs: url.search, cuerpo });
@@ -258,6 +265,8 @@ function simulador(quien, llamadas) {
       if (fn === "aprobar_turnos") return json(200, cuerpo.p_ids.length);
       return json(200, null);
     }
+    if (ruta.startsWith("/storage/v1/object/sign/")) return json(200, { signedURL: "/object/sign/documentos/x?token=t" });
+    if (ruta.startsWith("/storage/v1/object/")) return json(200, { Key: "ok" });
     if (ruta.startsWith("/functions/v1/crear-trabajador")) return json(201, { perfil_id: id("c9"), usuario: cuerpo.usuario || "x", clave_temporal: "sol-mar-isla-42" });
     if (ruta.startsWith("/rest/v1/")) {
       const tabla = ruta.split("/").pop();
@@ -278,7 +287,7 @@ const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
   { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
-  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos", "mivehiculo"], idiomas: ["es"], sufijo: "-movil" },
   { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
@@ -303,7 +312,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -604,6 +613,81 @@ await flujo("un trabajador sin vehículo no ve Mi vehículo", P.marie, 390, asyn
   await pg.goto(`${BASE}#/`);
   await pg.waitForTimeout(800);
   esperar((await pg.locator('a[href="#/mivehiculo"]').count()) === 0, "Marie ve una pestaña de vehículo sin tener uno");
+});
+
+await flujo("admin ve el reporte de gasolina, registra y quita una carga", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector('[data-seccion="gas"]');
+  await pg.click('[data-seccion="gas"]');
+  await pg.waitForSelector(".gas-reporte");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("$155") && txt.includes("Toyota Hilux 01") && txt.includes("Ford Transit"), "el reporte no suma la gasolina");
+  esperar(txt.includes("Juan") && /Ram[oó]n/.test(txt), "el reporte no muestra a los conductores");
+  await pg.screenshot({ path: `${CAPTURAS}/gasolina-admin.png`, fullPage: true });
+  // sin recibo no deja
+  await pg.click("[data-gas-nueva]");
+  await pg.selectOption("#gs-veh", id("v2"));
+  await pg.fill("#gs-total", "30");
+  await pg.evaluate(() => { document.querySelector("#gs-recibo").required = false; });
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar((await pg.locator("dialog .error-form").innerText()).includes("recibo") && !ll.some((x) => x.ruta.endsWith("/registrar_gasolina")), "dejó registrar sin recibo");
+  await pg.setInputFiles("#gs-recibo", { name: "recibo.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") });
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(400);
+  const r = ll.find((x) => x.ruta.endsWith("/registrar_gasolina"));
+  esperar(r && r.cuerpo.p_vehiculo === id("v2") && r.cuerpo.p_total === 30 && r.cuerpo.p_millas === null && r.cuerpo.p_recibo_path.startsWith(`${EMP.id}/gasolina/`), "datos mal enviados a registrar_gasolina");
+  esperar(ll.some((x) => x.metodo === "POST" && x.ruta.startsWith("/storage/v1/object/documentos/")), "no subió el recibo");
+  // corregir
+  await pg.click(`[data-gas-editar="${id("g2")}"]`);
+  await pg.fill("#gs-total", "58.5");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const c = ll.find((x) => x.ruta.endsWith("/corregir_gasolina"));
+  esperar(c && c.cuerpo.p_id === id("g2") && c.cuerpo.p_total === 58.5 && c.cuerpo.p_recibo_path === null, "datos mal enviados a corregir_gasolina");
+  // quitar
+  await pg.click(`[data-gas-quitar="${id("g1")}"]`);
+  await pg.click("dialog [data-si]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/quitar_gasolina") && x.cuerpo.p_id === id("g1")), "no llamó a quitar_gasolina");
+});
+
+await flujo("dueño ve la gasolina sin poder cambiarla", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector('[data-seccion="gas"]');
+  await pg.click('[data-seccion="gas"]');
+  await pg.waitForSelector(".gas-reporte");
+  esperar((await pg.locator("[data-gas-nueva], [data-gas-editar], [data-gas-quitar]").count()) === 0, "el dueño ve botones de edición de gasolina");
+  esperar((await pg.locator("[data-gas-ver]").count()) > 0, "el dueño no puede ver los recibos");
+});
+
+await flujo("el conductor registra y corrige su gasolina", P.juan, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/`);
+  await pg.waitForSelector('a[href="#/mivehiculo"]');
+  await pg.goto(`${BASE}#/mivehiculo`);
+  await pg.waitForSelector(".gas-conductor");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("$60") || txt.includes("60.00"), "no muestra sus cargas");
+  esperar(!txt.includes("$40"), "ve cargas de otro conductor");
+  await pg.screenshot({ path: `${CAPTURAS}/gasolina-conductor.png`, fullPage: true });
+  esperar((await pg.locator("[data-gas-quitar]").count()) === 0, "el conductor puede quitar cargas");
+  await pg.click("[data-gas-nueva]");
+  await pg.fill("#gs-total", "45");
+  await pg.fill("#gs-millas", "48000");
+  await pg.setInputFiles("#gs-recibo", { name: "r.png", mimeType: "image/png", buffer: Buffer.from("x") });
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar(!ll.some((x) => x.ruta.endsWith("/registrar_gasolina")), "dejó poner millas menores a las del vehículo");
+  await pg.fill("#gs-millas", "48900");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(400);
+  const r = ll.find((x) => x.ruta.endsWith("/registrar_gasolina"));
+  esperar(r && r.cuerpo.p_vehiculo === id("v1") && r.cuerpo.p_total === 45 && r.cuerpo.p_millas === 48900, "datos mal enviados a registrar_gasolina del conductor");
+  await pg.click(`[data-gas-editar="${id("g1")}"]`);
+  await pg.fill("#gs-total", "62");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/corregir_gasolina") && x.cuerpo.p_total === 62), "no corrigió la carga");
 });
 
 await flujo("admin revisa y guarda el presupuesto de una obra", P.admin, 1360, async (pg, ll) => {

@@ -7,6 +7,7 @@ import {
   html, crudo, fmtDia, hoyLocal, fechaLocal, sumarDias, aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, ICONO,
 } from "../ui.js";
 import { subirDocumento, mensajeArchivo } from "../archivos.js";
+import { montarGasolina } from "./gasolina.js";
 
 // Documentos del vehículo y cuántos días antes empieza el aviso (igual que la base de datos).
 export const DOCS = { seguro_vehiculo: "veh.d_seguro", inspeccion_vehiculo: "veh.d_inspeccion", registro_vehiculo: "veh.d_registro" };
@@ -96,6 +97,7 @@ async function miVehiculo(el, ctx) {
       ${ps.length ? html`<div class="veh-lista">${ps.map(({ p, e }) => html`<div class="veh-fila">
         <div><div class="fuerte">${p.nombre}</div><div class="sub">${textoCada(p)}</div></div>${pildora(e.sev, e.txt)}</div>`)}</div>`
         : html`<p class="sub">${t("veh.mi_sin_planes")}</p>`}
+      <div class="veh-gas" data-gas-v="${v.id}"></div>
     </section>`;
   };
   const pintar = () => {
@@ -103,6 +105,10 @@ async function miVehiculo(el, ctx) {
       <div class="titulo-vista"><h1>${t("veh.mi_titulo")}</h1></div>
       <p class="nota">${t("veh.mi_nota")}</p>
       ${vehs.length ? vehs.map(tarjeta) : html`<div class="vacio">${t("veh.mi_vacio")}</div>`}`);
+    vehs.forEach((v) => {
+      const caja = el.querySelector(`[data-gas-v="${v.id}"]`);
+      if (caja) montarGasolina(caja, ctx, { vehiculo: v, alCambiar: cargar }).catch(() => {});
+    });
   };
   el.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-millas]");
@@ -118,7 +124,7 @@ async function flota(el, ctx) {
   const esAdmin = ctx.roles.includes("admin");
   const hoy = hoyLocal(ctx.empresa.zona_horaria);
   let vehs = []; let planes = []; let docs = []; let personas = []; let servicios = [];
-  let filtro = "todos"; let sel = null; let sub = "docs";
+  let filtro = "todos"; let sel = null; let sub = "docs"; let seccion = "flota";
   const urls = new Map();
 
   const cargar = async () => {
@@ -229,7 +235,20 @@ async function flota(el, ctx) {
     </section>`;
   };
 
+  const tabsSeccion = () => html`<div class="segmentos" role="group" aria-label="${t("veh.titulo")}">
+    <button type="button" class="seg ${seccion === "flota" ? "activo" : ""}" data-seccion="flota" aria-pressed="${seccion === "flota"}">${t("gas.seccion_flota")}</button>
+    <button type="button" class="seg ${seccion === "gas" ? "activo" : ""}" data-seccion="gas" aria-pressed="${seccion === "gas"}">${t("gas.titulo")}</button></div>`;
+
   const pintar = () => {
+    if (seccion === "gas") {
+      el.innerHTML = String(html`<div class="titulo-vista"><h1>${t("veh.titulo")}</h1>${esAdmin ? "" : html`<span class="pildora">${t("dueno.solo_lectura")}</span>`}</div>
+        ${tabsSeccion()}<div id="gas-box"></div>`);
+      montarGasolina(el.querySelector("#gas-box"), ctx, {
+        soloLectura: !esAdmin,
+        alCambiar: async () => { vehs = await api.sel("vehiculos", "select=*&activo=eq.true&order=nombre.asc"); },
+      }).catch((e) => aviso(mensajeError(e), "error"));
+      return;
+    }
     const res = vehs.map(resumen);
     const cuenta = (s) => res.filter((x) => x.sev === s).length;
     const lista = vehs.filter((v) => filtro === "todos" || resumen(v).sev !== "ok");
@@ -237,6 +256,7 @@ async function flota(el, ctx) {
     el.innerHTML = String(html`
       <div class="titulo-vista"><h1>${t("veh.titulo")}</h1>
         <div class="acciones">${esAdmin ? html`<button type="button" class="btn btn-pri" id="agregar">${crudo(ICONO.mas)} ${t("veh.agregar")}</button>` : html`<span class="pildora">${t("dueno.solo_lectura")}</span>`}</div></div>
+      ${tabsSeccion()}
       <div class="kpis">
         <div class="kpi"><span class="sub">${t("veh.total")}</span><span class="num">${vehs.length}</span></div>
         <div class="kpi"><span class="sub">${t("veh.k_vencido")}</span><span class="num rojo">${cuenta("error")}</span></div>
@@ -439,6 +459,7 @@ async function flota(el, ctx) {
     if (!b) return;
     try {
       const d = b.dataset;
+      if (d.seccion) { seccion = d.seccion; sel = null; pintar(); return; }
       if (d.filtro) { filtro = d.filtro; pintar(); return; }
       if (d.veh) { sel = d.veh; sub = "docs"; pintar(); el.querySelector("#veh-detalle")?.scrollIntoView({ block: "nearest" }); return; }
       if (b.id === "agregar") { formVehiculo(null); return; }

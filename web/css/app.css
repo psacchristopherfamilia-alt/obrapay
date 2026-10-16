@@ -450,3 +450,25 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .pres-form { display: grid; gap: 12px; border-top: 1px solid var(--borde); padding-top: 16px; }
 .pres-form input[type=range] { width: 100%; accent-color: var(--acento); }
 @media (max-width: 720px) { .pres-tabla { display: none; } .pres-tarjetas { display: grid; } .pres-tot { justify-items: start; } }
+
+/* Gasolina */
+.gas-reporte, .gas-conductor { display: grid; gap: 14px; min-width: 0; }
+.gas-conductor { border-top: 1px solid var(--borde); padding-top: 14px; }
+.gas-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gas-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.gas-dos > * { min-width: 0; }
+.gas-barras { display: grid; gap: 12px; }
+.gas-barra-t { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.gas-meses { display: flex; align-items: flex-end; gap: 10px; height: 130px; }
+.gas-mes { flex: 1; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: end; gap: 4px; height: 100%; min-width: 0; }
+.gas-mes i { display: block; width: 100%; background: var(--borde); border-radius: 6px 6px 2px 2px; align-self: end; }
+.gas-mes.ahora i { background: var(--acento); }
+.gas-mes b { font-size: 12px; } .gas-mes span { font-size: 12px; color: var(--gris); }
+.gas-tabla { min-width: 520px; }
+.gas-tabla td.num, .gas-tabla th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.gas-acc { white-space: normal; min-width: 150px; }
+.gas-acc .btn { margin: 2px 6px 2px 0; }
+.gas-conductor .gas-tabla { min-width: 0; }
+.gas-conductor .gas-tabla th, .gas-conductor .gas-tabla td { padding-inline: 6px; }
+@media (max-width: 720px) { .gas-dos { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .gas-acc { min-width: 0; } .gas-conductor .gas-acc .btn { display: block; width: 100%; margin: 4px 0; } }
