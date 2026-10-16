@@ -12,15 +12,16 @@ import {
 import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
 import { vistaVencimientos } from "./vistas/vencimientos.js";
+import { vistaVehiculos } from "./vistas/vehiculos.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
-export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [] };
+export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [], tieneVehiculo: false };
 
-// Rutas: [ruta, clave de texto, roles que la ven, función de la vista, solo con varias compañías]
+// Rutas: [ruta, clave de texto, roles que la ven, función de la vista, solo con varias compañías, condición extra]
 const RUTAS = [
   ["reloj", "nav.reloj", ["trabajador"], vistaReloj],
   ["horas", "nav.horas", ["trabajador"], vistaMisHoras],
@@ -37,11 +38,13 @@ const RUTAS = [
   ["companias", "nav.companias", ["admin", "dueno"], vistaCompanias, true],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
   ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],
+  ["vehiculos", "nav.vehiculos", ["admin", "dueno"], vistaVehiculos],
+  ["mivehiculo", "nav.mi_vehiculo", ["trabajador", "supervisor"], vistaVehiculos, false, () => ctx.tieneVehiculo && !esGerencia()],
   ["vencimientos", "nav.vencimientos", ["admin", "dueno"], vistaVencimientos],
   ["contador", "nav.contador", ["admin", "dueno"], vistaContador],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
-const rutasDe = (roles) => RUTAS.filter(([, , r, , multi]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1));
+const rutasDe = (roles) => RUTAS.filter(([, , r, , multi, cond]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1) && (!cond || cond()));
 const esGerencia = () => ctx.roles.includes("admin") || ctx.roles.includes("dueno");
 
 let limpiezas = [];
@@ -51,13 +54,13 @@ function limpiar() { limpiezas.forEach((f) => { try { f(); } catch { /* nada */ 
 // Copia del contexto para abrir la app sin señal (solo trabajadores marcan sin conexión).
 const llaveCtx = (yo) => `obrapay.ctx.${yo}`;
 function guardarCtx(yo) {
-  try { localStorage.setItem(llaveCtx(yo), JSON.stringify({ perfil: ctx.perfil, empresa: ctx.empresa, empresas: ctx.empresas, ajustes: ctx.ajustes })); } catch { /* nada */ }
+  try { localStorage.setItem(llaveCtx(yo), JSON.stringify({ perfil: ctx.perfil, empresa: ctx.empresa, empresas: ctx.empresas, ajustes: ctx.ajustes, tieneVehiculo: ctx.tieneVehiculo })); } catch { /* nada */ }
 }
 function cargarCtxGuardado(yo) {
   try {
     const c = JSON.parse(localStorage.getItem(llaveCtx(yo)));
     if (!c?.perfil || c.perfil.id !== yo) return false;
-    ctx.perfil = c.perfil; ctx.empresa = c.empresa; ctx.empresas = c.empresas || []; ctx.ajustes = c.ajustes || {};
+    ctx.perfil = c.perfil; ctx.empresa = c.empresa; ctx.empresas = c.empresas || []; ctx.ajustes = c.ajustes || {}; ctx.tieneVehiculo = !!c.tieneVehiculo;
     ctx.roles = c.perfil.roles || [];
     fijarIdioma(c.perfil.idioma);
     fijarZona(c.empresa?.zona_horaria);
@@ -90,6 +93,11 @@ async function cargarContextoRed(yo) {
   ctx.empresas = misEmpresas || [];
   ctx.ajustes = Object.fromEntries((ajustes || []).map((x) => [x.empresa_id, x]));
   ctx.roles = perfil.roles || [];
+  // Quien maneja un vehículo asignado ve "Mi vehículo" para actualizar las millas.
+  ctx.tieneVehiculo = false;
+  if (!esGerencia() && ctx.roles.some((r) => ["trabajador", "supervisor"].includes(r))) {
+    try { ctx.tieneVehiculo = (await api.sel("vehiculos", "select=id&activo=eq.true&limit=1")).length > 0; } catch { /* sin vehículos todavía */ }
+  }
   fijarIdioma(perfil.idioma);
   fijarZona(ctx.empresa.zona_horaria);
 }

@@ -1,7 +1,9 @@
-// Vencimientos de documentos: permiso de trabajo, licencia de construcción, licencia de conducir y seguro de vehículo.
+// Vencimientos de documentos: permiso de trabajo, licencia de construcción y licencia de conducir.
+// (El seguro, la inspección y el registro de cada vehículo viven en la pantalla Vehículos.)
 // El admin guarda la fecha y el archivo; la base de datos avisa cada día desde que empieza la ventana hasta que se renueve.
-import { api, ApiError } from "../api.js";
+import { api } from "../api.js";
 import { t } from "../i18n.js";
+import { subirDocumento, mensajeArchivo } from "../archivos.js";
 import {
   html, crudo, fmtDia, hoyLocal, sumarDias, aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, ICONO,
 } from "../ui.js";
@@ -11,7 +13,6 @@ export const TIPOS = {
   permiso_trabajo: { n: "venc.t_permiso", ventana: 90, persona: true },
   licencia_construccion: { n: "venc.t_construccion", ventana: 90, persona: false },
   licencia_conducir: { n: "venc.t_conducir", ventana: 30, persona: true },
-  seguro_vehiculo: { n: "venc.t_seguro", ventana: 30, persona: false },
 };
 const dif = (a, b) => Math.round((Date.UTC(...b.split("-").map((x, i) => (i === 1 ? Number(x) - 1 : Number(x)))) - Date.UTC(...a.split("-").map((x, i) => (i === 1 ? Number(x) - 1 : Number(x))))) / 86400000);
 const fecha = (d) => fmtDia(d, { day: "numeric", month: "short", year: "numeric" });
@@ -31,10 +32,12 @@ export async function vistaVencimientos(el, ctx) {
   const faltan = (d) => { const n = dias(d); return n < 0 ? t("venc.hace", { n: -n }) : n === 0 ? t("venc.hoy") : t("venc.faltan", { n }); };
 
   const cargar = async () => {
-    [docs, personas] = await Promise.all([
+    let todos;
+    [todos, personas] = await Promise.all([
       api.sel("documentos", "select=*&activo=eq.true&order=vence.asc"),
       api.sel("perfiles", "select=id,nombre,roles&activo=eq.true&order=nombre.asc"),
     ]);
+    docs = todos.filter((d) => TIPOS[d.tipo]);
     pintar();
   };
 
@@ -94,17 +97,8 @@ export async function vistaVencimientos(el, ctx) {
       ${grupo("error", "venc.vencidos")}${grupo("aviso", "venc.por_renovar")}${grupo("ok", "venc.vigentes")}`);
   };
 
-  // Sube el archivo al depósito privado (ruta: <compañía>/<id>.<ext>).
-  const subir = async (archivo) => {
-    if (!archivo || !archivo.size) return {};
-    if (archivo.size > 10 * 1024 * 1024) throw new ApiError(t("venc.archivo_grande"), 0);
-    if (!/^(application\/pdf|image\/(jpeg|png|webp))$/.test(archivo.type)) throw new ApiError(t("venc.archivo_tipo"), 0);
-    const ext = archivo.type === "application/pdf" ? "pdf" : archivo.type.split("/")[1].replace("jpeg", "jpg");
-    const ruta = `${ctx.empresa.id}/${crypto.randomUUID()}.${ext}`;
-    await api.subirArchivo("documentos", ruta, archivo);
-    return { ruta, nombre: archivo.name.slice(0, 120) };
-  };
-  const msj = (e) => (e instanceof ApiError && e.status === 0 && e.message !== "sin_conexion" ? e.message : mensajeError(e));
+  const subir = (archivo) => subirDocumento(ctx, archivo);
+  const msj = mensajeArchivo;
 
   const formulario = (doc) => {
     const editar = !!doc;
@@ -115,7 +109,7 @@ export async function vistaVencimientos(el, ctx) {
         <div class="campo" id="dc-c-persona"><label for="dc-persona">${t("venc.f_trabajador")}</label>
           <select id="dc-persona" name="perfil"><option value="">—</option>
             ${personas.filter((p) => p.roles.some((r) => ["trabajador", "supervisor"].includes(r))).map((p) => html`<option value="${p.id}" ${doc?.perfil_id === p.id ? html`selected` : ""}>${p.nombre}</option>`)}</select></div>
-        <div class="campo" id="dc-c-titulo"><label for="dc-titulo" id="dc-l-titulo">${t("venc.f_vehiculo")}</label>
+        <div class="campo" id="dc-c-titulo"><label for="dc-titulo" id="dc-l-titulo">${t("venc.f_titulo_construccion")}</label>
           <input id="dc-titulo" name="titulo" maxlength="120" value="${doc?.titulo || ""}"></div>
         <div class="dos-col">
           <div class="campo"><label for="dc-numero">${t("venc.f_numero")}</label><input id="dc-numero" name="numero" maxlength="60" value="${doc?.numero || ""}"></div>
@@ -133,7 +127,6 @@ export async function vistaVencimientos(el, ctx) {
       const tp = TIPOS[f.tipo.value];
       d.querySelector("#dc-c-persona").hidden = !tp.persona;
       d.querySelector("#dc-c-titulo").hidden = tp.persona;
-      d.querySelector("#dc-l-titulo").textContent = t(f.tipo.value === "seguro_vehiculo" ? "venc.f_vehiculo" : "venc.f_titulo_construccion");
     };
     f.tipo.addEventListener("change", ajustar);
     ajustar();
@@ -141,7 +134,7 @@ export async function vistaVencimientos(el, ctx) {
       ev.preventDefault();
       const err = f.querySelector(".error-form");
       const tp = TIPOS[f.tipo.value];
-      if (!f.vence.value || (tp.persona && !f.perfil.value) || (f.tipo.value === "seguro_vehiculo" && !f.titulo.value.trim())) {
+      if (!f.vence.value || (tp.persona && !f.perfil.value)) {
         err.hidden = false; err.textContent = t("venc.faltan_datos"); return;
       }
       try {

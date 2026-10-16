@@ -101,13 +101,27 @@ const AVISOS_ADMIN = [
   { id: id("na3"), perfil_id: P.admin.id, tipo: "turnos_sin_aprobar", datos: { n: 3 }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
   { id: id("na4"), perfil_id: P.admin.id, tipo: "tope_seguro", datos: { agencia: "NIB", nombre: "Juan <b>Pérez</b>" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
   { id: id("na5"), perfil_id: P.admin.id, tipo: "documento_por_vencer", datos: { documento: "d1", doc_tipo: "permiso_trabajo", quien: "Marie <i>Joseph</i>", vence: "2026-11-05", dias: 20 }, leida: false, creado_en: "2026-10-15T13:00:00Z" },
+  { id: id("na6"), perfil_id: P.admin.id, tipo: "mantenimiento_vehiculo", datos: { plan: "p1", servicio: "Cambio de <u>aceite</u>", quien: "Toyota Hilux 01 · TCI 4821", por: "fecha", dias: 10 }, leida: false, creado_en: "2026-10-15T13:10:00Z" },
 ];
 const sumar = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const DOCUMENTOS = [
   { id: id("d1"), empresa_id: EMP.id, tipo: "permiso_trabajo", perfil_id: P.juan.id, titulo: null, numero: "WP-2024-01877", vence: sumar(20), archivo_path: `${EMP.id}/a.pdf`, archivo_nombre: "permiso_juan.pdf", activo: true },
-  { id: id("d2"), empresa_id: EMP.id, tipo: "seguro_vehiculo", perfil_id: null, titulo: "Toyota Hilux · TCI 4821", numero: "POL-77120", vence: sumar(-4), archivo_path: null, archivo_nombre: null, activo: true },
+  { id: id("d2"), empresa_id: EMP.id, tipo: "licencia_construccion", perfil_id: null, titulo: "Licencia Grace Bay", numero: "BL-77120", vence: sumar(-4), archivo_path: null, archivo_nombre: null, activo: true },
   { id: id("d3"), empresa_id: EMP.id, tipo: "licencia_conducir", perfil_id: P.marie.id, titulo: null, numero: "DL-1", vence: sumar(200), archivo_path: null, archivo_nombre: null, activo: true },
+  { id: id("d4"), empresa_id: EMP.id, tipo: "seguro_vehiculo", perfil_id: null, vehiculo_id: id("v1"), titulo: null, numero: "POL-77120", vence: sumar(-4), archivo_path: null, archivo_nombre: null, activo: true },
+  { id: id("d5"), empresa_id: EMP.id, tipo: "inspeccion_vehiculo", perfil_id: null, vehiculo_id: id("v1"), titulo: null, numero: "INS-9", vence: sumar(200), archivo_path: null, archivo_nombre: null, activo: true },
+  { id: id("d6"), empresa_id: EMP.id, tipo: "registro_vehiculo", perfil_id: null, vehiculo_id: id("v2"), titulo: null, numero: "REG-4", vence: sumar(100), archivo_path: null, archivo_nombre: null, activo: true },
 ];
+const VEHICULOS = [
+  { id: id("v1"), empresa_id: EMP.id, nombre: "Toyota Hilux 01", placa: "TCI 4821", tipo: "camioneta", marca: "Toyota", modelo: "Hilux", anio: 2021, vin: "MR0FB8CD600123456", foto_path: null, foto_nombre: null, conductor_id: P.juan.id, millas: 48600, millas_en: "2026-10-14T12:00:00Z", activo: true },
+  { id: id("v2"), empresa_id: EMP.id, nombre: "Ford Transit", placa: "TCI 3310", tipo: "van", marca: "Ford", modelo: "Transit", anio: 2019, vin: null, foto_path: null, foto_nombre: null, conductor_id: null, millas: 1200, millas_en: "2026-10-01T12:00:00Z", activo: true },
+];
+const PLANES = [
+  { id: id("p1"), empresa_id: EMP.id, vehiculo_id: id("v1"), nombre: "Cambio de aceite", cada_millas: 5000, cada_dias: 90, ultimo_fecha: sumar(-80), ultimo_millas: 45900, activo: true },
+  { id: id("p2"), empresa_id: EMP.id, vehiculo_id: id("v1"), nombre: "Rotación de llantas", cada_millas: 5000, cada_dias: null, ultimo_fecha: sumar(-30), ultimo_millas: 44000, activo: true },
+  { id: id("p3"), empresa_id: EMP.id, vehiculo_id: id("v2"), nombre: "Frenos", cada_millas: 20000, cada_dias: null, ultimo_fecha: sumar(-30), ultimo_millas: 0, activo: true },
+];
+const SERVICIOS = [{ id: id("sv1"), vehiculo_id: id("v1"), plan_id: id("p1"), nombre: "Cambio de aceite", fecha: sumar(-80), millas: 45900, costo: 92.5, notas: "Aceite 5W-30" }];
 const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", datos: { antes: 17, despues: 18, desde: "2026-10-01" }, leida: false, creado_en: "2026-10-01T12:00:00Z" }];
 
 // ---------------------------------------------------------------------------
@@ -183,6 +197,7 @@ function simulador(quien, llamadas) {
       { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", estado: "cerrada", pago: "2026-10-09", anio: 2026, mes: 10, nro: 2 }],
     datos_empleador: (a) => [{ empresa_id: a.p_empresa, nombre: a.p_empresa === EMP2.id ? EMP2.nombre : EMP.nombre, nib_registro: "REG-123", nib_seguro: null, direccion: null, apartado: null, telefono: null }],
     guardar_datos_empleador: () => null,
+    guardar_vehiculo: (a) => a.p_id || id("v3"),
     actualizar_nombre_legal: () => null,
     reporte_seguros: () => [
       { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", pago: "2026-10-09", nro: 2, perfil_id: P.juan.id, apellido: "Pérez", nombre: "Juan", inicial: null, nombre_completo: "Juan Pérez",
@@ -209,6 +224,9 @@ function simulador(quien, llamadas) {
       { id: id("x1"), proyecto_id: id("f1"), categoria: "materiales", monto: 120, fecha: "2026-10-14", descripcion: "Tubería PVC", proveedor: "Ferretería Island", anulado: false, anulado_motivo: null, proyectos: { nombre: "Villa Grace Bay" } },
       { id: id("x2"), proyecto_id: null, categoria: "poliza", monto: 900, fecha: "2026-10-01", descripcion: null, proveedor: "Aseguradora", anulado: true, anulado_motivo: "duplicado", proyectos: null }],
     documentos: () => DOCUMENTOS,
+    vehiculos: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? VEHICULOS : VEHICULOS.filter((x) => x.conductor_id === quien.id)),
+    vehiculo_planes: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? PLANES : PLANES.filter((x) => VEHICULOS.find((v) => v.id === x.vehiculo_id)?.conductor_id === quien.id)),
+    vehiculo_servicios: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? SERVICIOS : []),
     proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
@@ -250,9 +268,9 @@ const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
-  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "vehiculos", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "vehiculos", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -276,7 +294,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -429,8 +447,9 @@ await flujo("admin agrega, renueva y quita documentos", P.admin, 1360, async (pg
   await pg.goto(`${BASE}#/vencimientos`);
   await pg.waitForSelector(`[data-doc="${id("d1")}"]`);
   const lista = await pg.innerText("#vista");
-  esperar(lista.includes("Juan Pérez") && lista.includes("Toyota Hilux") && lista.includes("hace 4 d"), "no lista los documentos con sus días");
-  esperar((await pg.innerText(`[data-doc="${id("d2")}"]`)).toLowerCase().includes("vencido"), "el seguro vencido no se marca como vencido");
+  esperar(lista.includes("Juan Pérez") && lista.includes("Licencia Grace Bay") && /hace [34] d/.test(lista), "no lista los documentos con sus días");
+  esperar(!lista.includes("POL-77120") && !lista.includes("REG-4") && !lista.includes("INS-9"), "Vencimientos lista documentos de vehículos");
+  esperar((await pg.innerText(`[data-doc="${id("d2")}"]`)).toLowerCase().includes("vencido"), "la licencia vencida no se marca como vencida");
   esperar((await pg.innerText(`[data-doc="${id("d1")}"]`)).toLowerCase().includes("renovar"), "el permiso a 20 días debe estar por renovar");
   esperar((await pg.innerText(`[data-doc="${id("d3")}"]`)).toLowerCase().includes("vigente"), "la licencia a 200 días debe estar vigente");
   await pg.click(`[data-doc="${id("d1")}"]`);
@@ -438,13 +457,14 @@ await flujo("admin agrega, renueva y quita documentos", P.admin, 1360, async (pg
   esperar((await pg.innerText("#doc-detalle")).includes("permiso_juan.pdf"), "el detalle no muestra el archivo");
   // agregar
   await pg.click("#agregar");
-  await pg.selectOption("#dc-tipo", "seguro_vehiculo");
-  await pg.fill("#dc-titulo", "Ford Transit · TCI 3310");
+  esperar((await pg.locator('#dc-tipo option[value="seguro_vehiculo"]').count()) === 0, "Vencimientos todavía ofrece el seguro de vehículo");
+  await pg.selectOption("#dc-tipo", "licencia_construccion");
+  await pg.fill("#dc-titulo", "Licencia Leeward");
   await pg.fill("#dc-vence", "2027-03-01");
   await pg.click("dialog button[type=submit]");
   await pg.waitForTimeout(300);
   const g = ll.find((x) => x.ruta.endsWith("/guardar_documento"));
-  esperar(g && g.cuerpo.p_tipo === "seguro_vehiculo" && g.cuerpo.p_titulo === "Ford Transit · TCI 3310" && g.cuerpo.p_vence === "2027-03-01" && g.cuerpo.p_perfil === null, "datos mal enviados a guardar_documento");
+  esperar(g && g.cuerpo.p_tipo === "licencia_construccion" && g.cuerpo.p_titulo === "Licencia Leeward" && g.cuerpo.p_vence === "2027-03-01" && g.cuerpo.p_perfil === null, "datos mal enviados a guardar_documento");
   // validar
   await pg.click("#agregar");
   await pg.selectOption("#dc-tipo", "permiso_trabajo");
@@ -470,6 +490,111 @@ await flujo("dueño ve los vencimientos sin poder editarlos", P.dueno, 1360, asy
   esperar((await pg.locator("#agregar").count()) === 0, "el dueño ve el botón de agregar");
   await pg.click(`[data-doc="${id("d1")}"]`);
   esperar((await pg.locator('[data-accion="renovar"], [data-accion="quitar"]').count()) === 0, "el dueño ve botones de edición");
+});
+
+await flujo("admin controla la flota de vehículos", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector(`[data-veh="${id("v1")}"]`);
+  const lista = await pg.innerText("#vista");
+  esperar(lista.includes("Toyota Hilux 01") && lista.includes("TCI 4821") && lista.includes("Ford Transit"), "no lista los vehículos");
+  esperar((await pg.getAttribute(`[data-veh="${id("v1")}"]`, "class")).includes("veh-error"), "el seguro vencido no deja la tarjeta en rojo");
+  esperar((await pg.getAttribute(`[data-veh="${id("v2")}"]`, "class")).includes("veh-ok"), "el vehículo al día no está en verde");
+  await pg.click('[data-filtro="alertas"]');
+  esperar((await pg.locator("[data-veh]").count()) === 1, "el filtro de alertas debe dejar un vehículo");
+  await pg.click('[data-filtro="todos"]');
+  await pg.click(`[data-veh="${id("v1")}"]`);
+  await pg.waitForSelector("#veh-detalle");
+  const det = await pg.innerText("#veh-detalle");
+  esperar(det.includes("Juan Pérez") && det.includes("48,600") && det.includes("POL-77120"), "el detalle no muestra conductor, millas y seguro");
+  // millas
+  await pg.click('[data-accion="millas"]');
+  await pg.fill("#mi-millas", "48700");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const m = ll.find((x) => x.ruta.endsWith("/actualizar_millas"));
+  esperar(m && m.cuerpo.p_vehiculo === id("v1") && m.cuerpo.p_millas === 48700, "no llamó a actualizar_millas");
+  // mantenimiento
+  await pg.click('[data-sub="mant"]');
+  const mant = await pg.innerText("#veh-detalle");
+  esperar(mant.includes("Cambio de aceite") && mant.includes("Rotación de llantas") && !mant.includes("Frenos"), "los planes del vehículo no son los correctos");
+  await pg.click(`[data-plan-servicio="${id("p1")}"]`);
+  await pg.fill("#sv-costo", "95.5");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const sv = ll.find((x) => x.ruta.endsWith("/registrar_servicio"));
+  esperar(sv && sv.cuerpo.p_plan === id("p1") && sv.cuerpo.p_costo === 95.5, "no llamó a registrar_servicio");
+  await pg.click("[data-plan-nuevo]");
+  await pg.fill("#pl-nombre", "Frenos delanteros");
+  await pg.fill("#pl-millas", "20000");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const pl = ll.find((x) => x.ruta.endsWith("/guardar_plan"));
+  esperar(pl && pl.cuerpo.p_vehiculo === id("v1") && pl.cuerpo.p_nombre === "Frenos delanteros" && pl.cuerpo.p_cada_millas === 20000 && pl.cuerpo.p_cada_dias === null, "datos mal enviados a guardar_plan");
+  // plan sin intervalo
+  await pg.click("[data-plan-nuevo]");
+  await pg.fill("#pl-nombre", "Sin intervalo");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar((await pg.locator("dialog .error-form").innerText()).length > 0, "no pidió millas o días");
+  esperar(ll.filter((x) => x.ruta.endsWith("/guardar_plan")).length === 1, "envió un plan sin intervalo");
+  await pg.click("dialog [data-cerrar]");
+  // historial
+  await pg.click('[data-sub="hist"]');
+  await pg.waitForSelector("#veh-detalle table, #veh-detalle .tabla");
+  esperar((await pg.innerText("#veh-detalle")).includes("Aceite 5W-30"), "el historial no muestra el servicio");
+  // documento del vehículo
+  await pg.click('[data-sub="docs"]');
+  await pg.click("[data-doc-nuevo]");
+  await pg.fill("#vd-vence", "2027-05-01");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const gd = ll.find((x) => x.ruta.endsWith("/guardar_documento"));
+  esperar(gd && gd.cuerpo.p_vehiculo === id("v1") && gd.cuerpo.p_vence === "2027-05-01" && gd.cuerpo.p_perfil === null, "datos mal enviados a guardar_documento del vehículo");
+  // agregar vehículo
+  await pg.click("#agregar");
+  await pg.fill("#vh-nombre", "Nissan Frontier");
+  await pg.fill("#vh-placa", "TCI 9000");
+  await pg.fill("#vh-millas", "15000");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const gv = ll.find((x) => x.ruta.endsWith("/guardar_vehiculo"));
+  esperar(gv && gv.cuerpo.p_nombre === "Nissan Frontier" && gv.cuerpo.p_placa === "TCI 9000" && gv.cuerpo.p_millas === 15000 && gv.cuerpo.p_id === null, "datos mal enviados a guardar_vehiculo");
+  // el admin no tiene la pestaña "Mi vehículo"
+  esperar((await pg.locator('a[href="#/mivehiculo"]').count()) === 0, "el admin ve Mi vehículo");
+});
+
+await flujo("dueño ve los vehículos sin poder editarlos", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector(`[data-veh="${id("v1")}"]`);
+  esperar((await pg.locator("#agregar").count()) === 0, "el dueño ve el botón de agregar vehículo");
+  await pg.click(`[data-veh="${id("v1")}"]`);
+  await pg.waitForSelector("#veh-detalle");
+  esperar((await pg.locator('[data-accion="millas"], [data-accion="editar"], [data-accion="quitar"], [data-doc-nuevo], [data-doc-renovar], [data-plan-nuevo], [data-plan-servicio]').count()) === 0, "el dueño ve botones de edición");
+});
+
+await flujo("el conductor actualiza las millas de su vehículo", P.juan, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/`);
+  await pg.waitForSelector('a[href="#/mivehiculo"]');
+  await pg.goto(`${BASE}#/mivehiculo`);
+  await pg.waitForSelector("[data-millas]");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("Toyota Hilux 01") && txt.includes("Cambio de aceite") && !txt.includes("Ford Transit") && !txt.includes("POL-77120"), "Mi vehículo muestra datos que no le tocan");
+  await pg.click("[data-millas]");
+  await pg.fill("#mi-millas", "48000");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar((await pg.locator("dialog .error-form").innerText()).length > 0 && !ll.some((x) => x.ruta.endsWith("/actualizar_millas")), "dejó bajar las millas");
+  await pg.fill("#mi-millas", "48750");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const m = ll.find((x) => x.ruta.endsWith("/actualizar_millas"));
+  esperar(m && m.cuerpo.p_vehiculo === id("v1") && m.cuerpo.p_millas === 48750, "no llamó a actualizar_millas");
+});
+
+await flujo("un trabajador sin vehículo no ve Mi vehículo", P.marie, 390, async (pg) => {
+  await pg.goto(`${BASE}#/`);
+  await pg.waitForTimeout(800);
+  esperar((await pg.locator('a[href="#/mivehiculo"]').count()) === 0, "Marie ve una pestaña de vehículo sin tener uno");
 });
 
 await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {
@@ -576,12 +701,13 @@ await flujo("admin ve y descarta sus avisos", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/nomina`);
   await pg.waitForSelector(".avisos-admin");
   const txt = await pg.innerText(".avisos-admin");
-  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB") && txt.includes("Permiso de trabajo · Marie") && txt.includes("vence en 20 días"), "faltan avisos del admin");
+  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB") && txt.includes("Permiso de trabajo · Marie") && txt.includes("vence en 20 días") && txt.includes("Cambio de <u>aceite</u> · Toyota Hilux 01") && txt.includes("toca en 10 días"), "faltan avisos del admin");
+  esperar(!(await pg.innerHTML(".avisos-admin")).includes("<u>"), "el servicio del aviso no se escapó");
   esperar(!(await pg.innerHTML(".avisos-admin")).includes("<b>"), "el nombre del aviso no se escapó");
   await pg.click(`[data-leido="${id("na3")}"]`);
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.metodo === "PATCH" && x.ruta.endsWith("/notificaciones")), "no marcó el aviso como leído");
-  esperar((await pg.locator("[data-aviso]").count()) === 4, "no quitó el aviso descartado");
+  esperar((await pg.locator("[data-aviso]").count()) === 5, "no quitó el aviso descartado");
 });
 
 await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {

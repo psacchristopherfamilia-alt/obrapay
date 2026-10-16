@@ -4,8 +4,11 @@ import { api } from "./api.js";
 import { t } from "./i18n.js";
 import { html, esc, crudo, dinero, fmtDia, ICONO } from "./ui.js";
 
-const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro", "documento_por_vencer"];
-const DOC_TIPOS = { permiso_trabajo: "venc.t_permiso", licencia_construccion: "venc.t_construccion", licencia_conducir: "venc.t_conducir", seguro_vehiculo: "venc.t_seguro" };
+const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro", "documento_por_vencer", "mantenimiento_vehiculo"];
+const DOC_TIPOS = {
+  permiso_trabajo: "venc.t_permiso", licencia_construccion: "venc.t_construccion", licencia_conducir: "venc.t_conducir",
+  seguro_vehiculo: "venc.t_seguro", inspeccion_vehiculo: "venc.t_inspeccion", registro_vehiculo: "venc.t_registro",
+};
 const fecha = (d) => fmtDia(d, { day: "numeric", month: "short" });
 
 function texto(a) {
@@ -20,7 +23,17 @@ function texto(a) {
     case "documento_por_vencer": {
       const n = Number(d.dias);
       const x = { doc: t(DOC_TIPOS[d.doc_tipo] || "venc.titulo"), quien: esc(d.quien), n: Math.abs(n), fecha: fecha(d.vence) };
-      return [t(n < 0 ? "aviso.doc_vencido" : n === 0 ? "aviso.doc_hoy" : n === 1 ? "aviso.doc_manana" : "aviso.doc_vence", x), "vencimientos"];
+      return [t(n < 0 ? "aviso.doc_vencido" : n === 0 ? "aviso.doc_hoy" : n === 1 ? "aviso.doc_manana" : "aviso.doc_vence", x), d.vehiculo ? "vehiculos" : "vencimientos"];
+    }
+    case "mantenimiento_vehiculo": {
+      // Avisa por fecha (dias) o por millas, según cuál llegó primero.
+      const x = { servicio: esc(d.servicio), quien: esc(d.quien) };
+      if (d.por === "millas") {
+        const m = Number(d.millas);
+        return [t(m < 0 ? "aviso.mant_mi_atraso" : "aviso.mant_mi", { ...x, n: Math.abs(m).toLocaleString("en-US") }), "vehiculos"];
+      }
+      const n = Number(d.dias);
+      return [t(n < 0 ? "aviso.mant_atraso" : n === 0 ? "aviso.mant_hoy" : n === 1 ? "aviso.mant_manana" : "aviso.mant_dias", { ...x, n: Math.abs(n) }), "vehiculos"];
     }
     default: return null;
   }
