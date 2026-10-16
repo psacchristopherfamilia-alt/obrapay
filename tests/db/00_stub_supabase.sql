@@ -5,7 +5,9 @@ create schema if not exists extensions;
 
 create table if not exists auth.users (
   id    uuid primary key default gen_random_uuid(),
-  email text unique
+  email text unique,
+  instance_id uuid, aud text, role text, email_confirmed_at timestamptz,
+  raw_app_meta_data jsonb, raw_user_meta_data jsonb, created_at timestamptz, updated_at timestamptz
 );
 
 create or replace function auth.uid() returns uuid
