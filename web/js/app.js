@@ -184,6 +184,7 @@ function marco(rutaActual) {
         ${rutas.map(([r, clave]) => html`<a href="#/${r}" class="tab ${r === rutaActual ? "activo" : ""}" ${r === rutaActual ? html`aria-current="page"` : ""}>${t(clave)}</a>`)}
       </nav>` : ""}
       <main id="vista" class="contenido-movil" tabindex="-1"></main>
+      ${tieneMarca(ctx.empresa) ? html`<p class="hecho-con hecho-con-pie">${t("marca.hecho_con")}</p>` : ""}
     </div>`;
 }
 

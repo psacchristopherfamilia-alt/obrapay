@@ -1263,6 +1263,21 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   esperar(g.cuerpo.p_cambios.almuerzo_inicio === "12:00" && g.cuerpo.p_cambios.hora_extra_desde === "17:00", "cambió lo que no debía");
 });
 
+await flujo("plataforma: agregar un dueño de solo lectura a una compañía que ya existe", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector(`[data-pl-usuario="${id("e2")}"]`);
+  await pg.click(`[data-pl-usuario="${id("e2")}"]`);
+  await pg.waitForSelector("#us-tipo");
+  await pg.click("dialog button[type=submit]");
+  esperar(!(await pg.locator("dialog .error-form").isHidden()), "no pidió el nombre");
+  await pg.fill("#us-nombre", "Robbie Armstrong");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForSelector("[data-us-claves]");
+  const c = ll.find((x) => x.ruta.includes("crear-trabajador") && x.cuerpo.dueno);
+  esperar(c && c.cuerpo.empresa_id === id("e2") && c.cuerpo.trabajadores.length === 0 && c.cuerpo.dueno.nombre === "Robbie Armstrong", "no pidió crear el dueño en esa compañía");
+  esperar((await pg.innerText("[data-us-claves]")).includes("dueno.nuevo"), "no muestra la clave");
+});
+
 await flujo("plataforma: asistente de alta con Excel, obras y vehículos", P.plat, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/plataforma`);
   await pg.waitForSelector("[data-pl-nueva]");

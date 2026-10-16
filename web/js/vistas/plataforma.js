@@ -70,6 +70,7 @@ export async function vistaPlataforma(el, ctx) {
                   : html`<button type="button" class="btn btn-sec btn-chico" data-pl-suspender="${f.empresa_id}">${t("plat.suspender")}</button>`}
                 <button type="button" class="btn btn-sec btn-chico" data-pl-asistir="${f.empresa_id}">${t("plat.asistir")}</button>
                 <button type="button" class="btn btn-sec btn-chico" data-pl-config="${f.empresa_id}">${t("cfg.boton")}</button>
+                <button type="button" class="btn btn-sec btn-chico" data-pl-usuario="${f.empresa_id}">${t("usr.boton")}</button>
                 <button type="button" class="btn btn-sec btn-chico" data-pl-editar="${f.empresa_id}">${t("venc.editar")}</button></div></td></tr>`;
           })}</tbody></table></div></section>` : html`<div class="vacio">${t("plat.vacio")}</div>`}`;
   };
@@ -220,6 +221,66 @@ export async function vistaPlataforma(el, ctx) {
       try {
         await ocupado(form.querySelector("[type=submit]"), () => api.rpc("plataforma_guardar_config", { p_empresa: f.empresa_id, p_cambios: cambios }));
         cerrarModal(); aviso(t("cfg.guardada"));
+      } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
+    });
+  };
+
+  // ---------- agregar un usuario (dueño o administrador) a una compañía que ya existe ----------
+  const modalUsuario = async (f) => {
+    let lista = [];
+    try { lista = await api.rpc("plataforma_admins", {}); } catch { /* sin lista */ }
+    const dlg = abrirModal(t("usr.titulo", { nombre: f.nombre }), html`
+      <form class="form" novalidate>
+        <div class="campo"><label for="us-tipo">${t("usr.tipo")}</label>
+          <select id="us-tipo" name="tipo">
+            <option value="dueno">${t("usr.dueno")}</option>
+            <option value="admin">${t("usr.admin_nuevo")}</option>
+            ${lista.length ? html`<option value="existente">${t("usr.admin_existente")}</option>` : ""}
+          </select></div>
+        <div data-us-nuevo>
+          <div class="campo"><label for="us-nombre">${t("usr.nombre")}</label><input id="us-nombre" name="nombre" maxlength="80" autocomplete="off"></div>
+          <div class="campo"><label for="us-usuario">${t("usr.usuario")}</label><input id="us-usuario" name="usuario" maxlength="40" autocomplete="off" placeholder="${t("usr.usuario_ph")}"></div>
+        </div>
+        <div class="campo" data-us-existente hidden><label for="us-ex">${t("usr.elegir")}</label>
+          <select id="us-ex" name="ex">${lista.map((a) => html`<option value="${a.id}">${a.nombre} · ${a.companias || ""}</option>`)}</select></div>
+        <p class="sub" data-us-nota>${t("usr.nota_dueno")}</p>
+        <p class="error-form" role="alert" hidden></p>
+        <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
+          <button type="submit" class="btn btn-pri">${t("usr.crear")}</button></div>
+      </form>`);
+    const form = dlg.querySelector("form");
+    const err = form.querySelector(".error-form");
+    const ver = () => {
+      const ex = form.tipo.value === "existente";
+      form.querySelector("[data-us-nuevo]").hidden = ex; form.querySelector("[data-us-existente]").hidden = !ex;
+      form.querySelector("[data-us-nota]").textContent = t(form.tipo.value === "dueno" ? "usr.nota_dueno" : "usr.nota_admin");
+    };
+    form.tipo.addEventListener("change", ver); ver();
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault(); err.hidden = true;
+      const tipo = form.tipo.value;
+      if (tipo !== "existente" && !form.nombre.value.trim()) { err.hidden = false; err.textContent = t("usr.f_nombre"); return; }
+      const cuerpo = { accion: "crear_varios", empresa_id: f.empresa_id, vigente_desde: hoyLocal(), trabajadores: [] };
+      const persona = { nombre: form.nombre.value, usuario: form.usuario.value.trim() };
+      if (tipo === "dueno") cuerpo.dueno = persona;
+      else if (tipo === "admin") cuerpo.admin = persona;
+      else cuerpo.admin = { perfil_id: form.ex.value };
+      try {
+        const r = await ocupado(form.querySelector("[type=submit]"), () => api.funcion("crear-trabajador", cuerpo));
+        const x = tipo === "dueno" ? r.dueno : r.admin;
+        if (!x || !x.ok) { err.hidden = false; err.textContent = x?.error || t("usr.f_error"); return; }
+        const claves = x.clave_temporal ? `${x.usuario} · ${x.clave_temporal}` : "";
+        abrirModal(t("usr.listo_t"), html`
+          <div class="form">
+            <p><b>${x.nombre}</b> · ${t(tipo === "dueno" ? "usr.dueno" : "usr.admin_nuevo")} · ${f.nombre}</p>
+            ${claves ? html`<div class="plat-clave mono" data-us-claves>${claves}</div><p class="sub">${t("plat.res_aviso")}</p>`
+                     : html`<p class="sub">${t("usr.ya_existia", { usuario: x.usuario })}</p>`}
+            <div class="acciones-modal">
+              ${claves ? html`<button type="button" class="btn btn-sec" data-us-copiar>${t("plat.res_copiar")}</button>` : ""}
+              <button type="button" class="btn btn-pri" data-cerrar>${t("comun.cerrar")}</button></div>
+          </div>`);
+        const cp = document.querySelector("[data-us-copiar]");
+        if (cp) cp.addEventListener("click", async () => { try { await navigator.clipboard.writeText(claves); aviso(t("plat.res_copiado")); } catch { aviso(t("plat.res_no_copio"), "error"); } });
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
   };
@@ -508,6 +569,7 @@ export async function vistaPlataforma(el, ctx) {
         pintar();
       } else if (k.plQuitar) { const [l, i] = k.plQuitar.split(":"); d[l].splice(Number(i), 1); if (!d[l].length && l !== "trab") d[l].push(l === "obras" ? { nombre: "", direccion: "", presupuesto: "" } : { nombre: "", placa: "", tipo: "camioneta", conductor: "" }); pintar(); }
       else if (k.plPago) modalPago(filas.find((f) => f.empresa_id === k.plPago));
+      else if (k.plUsuario) await modalUsuario(filas.find((f) => f.empresa_id === k.plUsuario));
       else if (k.plConfig) await modalConfig(filas.find((f) => f.empresa_id === k.plConfig));
       else if (k.plEditar) modalEditar(filas.find((f) => f.empresa_id === k.plEditar));
       else if (k.plSuspender) {

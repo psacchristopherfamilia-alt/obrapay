@@ -150,6 +150,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); }
 .acceso-marca .marca-grande { font-size: 26px; overflow-wrap: anywhere; }
 .rec-marca { display: flex; align-items: center; gap: 12px; }
 .logo-recibo { width: 44px; height: 44px; }
+.hecho-con-pie { text-align: center; margin: 8px 0 0; }
 .hecho-con { margin: -6px 0 0; font-size: 11px; color: var(--gris); letter-spacing: .04em; }
 .nav-lista { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 4px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 4px; box-shadow: var(--sombra); }
 .nav-item { color: var(--tinta); text-decoration: none; padding: 9px 6px; border-radius: 8px; font-weight: 600; font-size: 14px; min-height: 40px; display: flex; align-items: center; justify-content: center; text-align: center; }
@@ -597,3 +598,4 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .cfg-color input[type=color] { width: 44px; height: 36px; padding: 2px; border-radius: 8px; }
 .cfg-vista { border: 1px solid var(--borde); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; background: var(--superficie); }
 .cfg-vista .btn { pointer-events: none; }
+.plat-clave { padding: 12px 14px; background: var(--fondo-suave); border-radius: 10px; word-break: break-all; }
