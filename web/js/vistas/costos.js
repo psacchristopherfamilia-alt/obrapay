@@ -1,4 +1,4 @@
-// Costo por vehículo: seguro + gasolina + mantenimiento (servicios con costo), por semana (jueves a miércoles) o por mes.
+// Costo por vehículo: seguro + gasolina + mantenimiento (servicios con costo), por semana (la de la nómina) o por mes.
 // Admin y dueño ven; solo el admin cambia el costo del seguro. Nada se reparte por obra.
 import { api } from "../api.js";
 import { t } from "../i18n.js";
@@ -15,10 +15,10 @@ const PAGOS_AL_ANIO = { mensual: 12, trimestral: 4, anual: 1 };
 const dia = (ymd) => Date.parse(`${ymd}T00:00:00Z`) / 86400000;
 const diasEntre = (a, b) => Math.round(dia(b) - dia(a));
 
-// La semana va de jueves a miércoles (igual que la nómina).
-export function inicioSemana(ymd) {
-  const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); // 0 = domingo … 4 = jueves
-  return sumarDias(ymd, -((dow - 4 + 7) % 7));
+// La semana empieza el día que usa la nómina de la compañía (1 = lunes … 7 = domingo; por defecto jueves).
+export function inicioSemana(ymd, inicioDia = 4) {
+  const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); // 0 = domingo … 6 = sábado
+  return sumarDias(ymd, -((dow - (inicioDia % 7) + 7) % 7));
 }
 export const seguroAnual = (s) => Number(s.monto) * PAGOS_AL_ANIO[s.frecuencia];
 export const seguroPorMes = (s) => seguroAnual(s) / 12;
@@ -35,9 +35,9 @@ export function seguroEnPeriodo(s, p) {
 }
 
 // Periodo `offset` (0 = el actual, -1 = el anterior…) como { tipo, ini, fin }.
-export function periodo(hoy, tipo, offset = 0) {
+export function periodo(hoy, tipo, offset = 0, inicioDia = 4) {
   if (tipo === "semana") {
-    const ini = sumarDias(inicioSemana(hoy), 7 * offset);
+    const ini = sumarDias(inicioSemana(hoy, inicioDia), 7 * offset);
     return { tipo, ini, fin: sumarDias(ini, 6) };
   }
   const [y, m] = hoy.split("-").map(Number);
@@ -124,10 +124,10 @@ export async function montarCostos(box, ctx, { soloLectura = false } = {}) {
     if (!vehs.length) { box.innerHTML = String(html`<div class="vacio">${t("cos.sin_vehiculos")}</div>`); return; }
     const ids = sel === "todos" ? vehs.map((v) => v.id) : [sel];
     const datos = { ids, gas, servicios, seguros };
-    const p = periodo(hoy, tipo, off);
+    const p = periodo(hoy, tipo, off, ctx.empresa.semana_inicio_dia || 4);
     const c = costosPeriodo(datos, p);
     const N = tipo === "semana" ? 6 : 4;
-    const hist = Array.from({ length: N }, (_, i) => periodo(hoy, tipo, off - (N - 1 - i)));
+    const hist = Array.from({ length: N }, (_, i) => periodo(hoy, tipo, off - (N - 1 - i), ctx.empresa.semana_inicio_dia || 4));
     const totales = hist.map((x) => costosPeriodo(datos, x).total);
     const maxH = Math.max(...totales, 1);
     const v = vehs.find((x) => x.id === sel);

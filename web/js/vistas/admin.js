@@ -46,7 +46,7 @@ export function kpis(d, semana) {
       <div class="kpi"><div class="sub">${t("nomina.descuentos")}</div><div class="num rojo">${dinero(d.tot.seguro + d.tot.prestamo)}</div>
         <div class="sub">${t("nomina.desglose_desc", { seguro: dinero(d.tot.seguro), prestamo: dinero(d.tot.prestamo) })}</div></div>
       <div class="kpi oscuro"><div class="sub">${t("nomina.neto")}</div><div class="num">${dinero(d.tot.neto)}</div>
-        <div class="sub">${t("nomina.pago_dia", { dia: fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "short" }) })}</div></div>
+        <div class="sub">${t("nomina.pago_dia", { dia: fmtDia((semana.pago || sumarDias(semana.fin, 2)), { weekday: "long", day: "numeric", month: "short" }) })}</div></div>
     </div>`;
 }
 
@@ -125,7 +125,7 @@ export function exportarNomina(d, semana, empresa) {
     columnas: [{ titulo: t("excel.campo"), ancho: 22 }, { titulo: t("excel.valor"), ancho: 40 }],
     filas: [
       [t("excel.empresa"), empresa.nombre], [t("comun.semana"), `${semana.inicio} – ${semana.fin}`],
-      [t("col.estado"), t(`semana.${semana.estado}`)], [t("excel.dia_pago"), sumarDias(semana.fin, 2)],
+      [t("col.estado"), t(`semana.${semana.estado}`)], [t("excel.dia_pago"), (semana.pago || sumarDias(semana.fin, 2))],
       [t("excel.generado"), new Date().toISOString()],
     ],
   };
@@ -141,7 +141,7 @@ function pasosCiclo(semana) {
     ${paso(cerrada, !cerrada, t("ciclo.cierre"), fmtDia(semana.fin, { weekday: "short", day: "numeric", month: "short" }) + " 11:59 p.m.")}
     ${paso(cerrada, false, t("ciclo.reporte"), fmtDia(sumarDias(semana.fin, 1), { weekday: "short", day: "numeric", month: "short" }))}
     ${paso(pagada, cerrada && !pagada, t("ciclo.revisar"), t("ciclo.admin"))}
-    ${paso(pagada, false, t("ciclo.pago"), fmtDia(sumarDias(semana.fin, 2), { weekday: "short", day: "numeric", month: "short" }))}
+    ${paso(pagada, false, t("ciclo.pago"), fmtDia((semana.pago || sumarDias(semana.fin, 2)), { weekday: "short", day: "numeric", month: "short" }))}
   </div>`;
 }
 

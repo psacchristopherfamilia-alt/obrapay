@@ -176,7 +176,7 @@ function simulador(quien, llamadas) {
     plataforma_pagos: () => PL.pagos,
     plataforma_pago: (b) => { const f = PL.filas.find((x) => x.empresa_id === b.p_empresa); f.vence = sumar(30); PL.suspendidas.delete(b.p_empresa); PL.pagos.unshift({ creado_en: new Date().toISOString(), monto: b.p_monto, vence_despues: f.vence }); return f.vence; },
     plataforma_config: (b) => ({ empresa_id: b.p_empresa, nombre: "Compañía", extra_multiplicador: 1, extra_mult_desde: null, hora_extra_desde: "17:00", hora_cierre_turno: "23:00",
-      almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", marca_nombre: null, marca_color: null, marca_logo: null }),
+      almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", semana_inicio_dia: 4, pago_dias_despues: 2, marca_nombre: null, marca_color: null, marca_logo: null }),
     plataforma_guardar_config: () => null,
     plataforma_suspender: (b) => { if (b.p_suspender) PL.suspendidas.add(b.p_empresa); else PL.suspendidas.delete(b.p_empresa); return null; },
     plataforma_entrar: () => { PL.asistiendo = true; quien.roles = ["admin"]; return null; },
@@ -1240,6 +1240,13 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   await pg.goto(`${BASE}#/plataforma`);
   await pg.waitForSelector(`[data-pl-config="${id("e1")}"]`);
   await pg.click(`[data-pl-config="${id("e1")}"]`);
+  await pg.waitForSelector("#cf-di");
+  // calendario: jueves a miércoles, pago el viernes; se cambia a lunes y 4 días después
+  esperar((await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("jueves a miércoles") && (await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("viernes"), "no resume el calendario actual");
+  await pg.selectOption("#cf-di", "1");
+  await pg.fill("#cf-dp", "4");
+  esperar((await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("lunes a domingo") && (await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("jueves"), "no actualiza el resumen del calendario");
+  await pg.click('[data-cfg-tab="extra"]');
   await pg.waitForSelector("#cf-mult");
   // un multiplicador sin fecha no se guarda
   await pg.fill("#cf-mult", "1.5");
@@ -1260,6 +1267,7 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   esperar(g && g.cuerpo.p_empresa === id("e1"), "no guardó la configuración");
   esperar(g.cuerpo.p_cambios.extra_multiplicador === 1.5 && g.cuerpo.p_cambios.extra_mult_desde === "2026-10-15", "no mandó el multiplicador con su fecha");
   esperar(g.cuerpo.p_cambios.marca_nombre === "Constructora Prueba" && g.cuerpo.p_cambios.marca_color === "#1a73e8" && g.cuerpo.p_cambios.marca_logo === null, "no mandó la marca");
+  esperar(g.cuerpo.p_cambios.semana_inicio_dia === 1 && g.cuerpo.p_cambios.pago_dias_despues === 4, "no mandó el calendario de pago");
   esperar(g.cuerpo.p_cambios.almuerzo_inicio === "12:00" && g.cuerpo.p_cambios.hora_extra_desde === "17:00", "cambió lo que no debía");
 });
 

@@ -136,6 +136,7 @@ export async function vistaPlataforma(el, ctx) {
   };
 
   // ---------- configurar compañía: horas extra, turno y marca ----------
+  const nombreDia = (n) => fmtDia(`2024-01-0${n}`, { weekday: "long" }); // 2024-01-01 fue lunes
   const VARS_PREV = ["--acento", "--acento-osc", "--acento-suave", "--sobre-acento"];
   const ZONAS = ["America/Grand_Turk", "America/Nassau", "America/New_York", "America/Santo_Domingo", "America/Port-au-Prince", "America/Jamaica", "America/Puerto_Rico"];
   const modalConfig = async (f) => {
@@ -144,9 +145,19 @@ export async function vistaPlataforma(el, ctx) {
     const dlg = abrirModal(t("cfg.titulo", { nombre: f.nombre }), html`
       <form class="form" novalidate>
         <div class="cfg-tabs" role="tablist">
-          ${["extra", "turno", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "extra"}">${t(`cfg.tab_${k}`)}</button>`)}
+          ${["calendario", "extra", "turno", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "calendario"}">${t(`cfg.tab_${k}`)}</button>`)}
         </div>
-        <section class="cfg-panel" data-cfg-panel="extra">
+        <section class="cfg-panel" data-cfg-panel="calendario">
+          <div class="cfg-fila">
+            <div class="campo"><label for="cf-di">${t("cfg.sem_inicio")}</label>
+              <select id="cf-di" name="di">${[1, 2, 3, 4, 5, 6, 7].map((n) => html`<option value="${n}" ${n === Number(c.semana_inicio_dia) ? html`selected` : ""}>${nombreDia(n)}</option>`)}</select></div>
+            <div class="campo"><label for="cf-dp">${t("cfg.pago_despues")}</label>
+              <input id="cf-dp" name="dp" type="number" inputmode="numeric" min="0" max="13" step="1" value="${Number(c.pago_dias_despues)}"></div>
+          </div>
+          <div class="cfg-vista" data-cfg-cal></div>
+          <p class="sub">${t("cfg.cal_nota")}</p>
+        </section>
+        <section class="cfg-panel" data-cfg-panel="extra" hidden>
           <div class="campo"><label for="cf-hx">${t("cfg.extra_desde")}</label><input id="cf-hx" name="hx" type="time" value="${c.hora_extra_desde}" required></div>
           <div class="cfg-fila">
             <div class="campo"><label for="cf-mult">${t("cfg.mult")}</label><input id="cf-mult" name="mult" type="number" inputmode="decimal" min="1" max="3" step="0.05" value="${Number(c.extra_multiplicador)}"></div>
@@ -192,6 +203,12 @@ export async function vistaPlataforma(el, ctx) {
       ["[data-cfg-logo]", "[data-cfg-vista]"].forEach((q) => { const n = form.querySelector(q); VARS_PREV.forEach((k) => (v[k] ? n.style.setProperty(k, v[k]) : n.style.removeProperty(k))); });
       form.querySelector("[data-cfg-quitar-logo]").hidden = !st.logo;
     };
+    const verCal = () => {
+      const di = Number(form.di.value); const dp = Math.max(0, Math.min(13, Number(form.dp.value || 0)));
+      const fin = ((di + 5) % 7) + 1; const pago = ((fin - 1 + dp) % 7) + 1;
+      form.querySelector("[data-cfg-cal]").textContent = t("cfg.cal_resumen", { ini: nombreDia(di), fin: nombreDia(fin), pago: nombreDia(pago) });
+    };
+    form.di.addEventListener("change", verCal); form.dp.addEventListener("input", verCal); verCal();
     const verAlm = () => { form.querySelector("[data-cfg-alm]").hidden = !form.alm.checked; };
     pintarMarca(); verAlm();
     dlg.addEventListener("click", (ev) => {
@@ -211,12 +228,14 @@ export async function vistaPlataforma(el, ctx) {
     form.addEventListener("submit", async (ev) => {
       ev.preventDefault(); err.hidden = true;
       const mult = Number(form.mult.value || 1);
+      const dp = Number(form.dp.value || 0);
+      if (!(Number.isInteger(dp) && dp >= 0 && dp <= 13)) { err.hidden = false; err.textContent = t("cfg.f_pago"); return; }
       if (!(mult >= 1 && mult <= 3)) { err.hidden = false; err.textContent = t("cfg.f_mult"); return; }
       if (mult > 1 && !form.md.value) { err.hidden = false; err.textContent = t("cfg.f_mult_desde"); return; }
       const cambios = {
         hora_extra_desde: form.hx.value, extra_multiplicador: mult, extra_mult_desde: mult > 1 ? form.md.value : null,
         hora_cierre_turno: form.hc.value, almuerzo_inicio: form.alm.checked ? form.ai.value : null, almuerzo_fin: form.alm.checked ? form.af.value : null,
-        zona_horaria: form.z.value.trim(), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
+        zona_horaria: form.z.value.trim(), semana_inicio_dia: Number(form.di.value), pago_dias_despues: Number(form.dp.value || 0), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
       };
       try {
         await ocupado(form.querySelector("[type=submit]"), () => api.rpc("plataforma_guardar_config", { p_empresa: f.empresa_id, p_cambios: cambios }));

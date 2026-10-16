@@ -334,7 +334,7 @@ export function recibo(filas, turnos, semana, ctx, trab = ctx.perfil) {
   const neto = filas.reduce((a, f) => a + Number(f.neto), 0);
   const aporteNib = filas.reduce((a, f) => a + Number(f.nib_empleador || 0), 0);
   const aporteNhip = filas.reduce((a, f) => a + Number(f.nhip_empleador || 0), 0);
-  const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const viernes = fmtDia((semana.pago || sumarDias(semana.fin, 2)), { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   const estados = [...new Set(filas.map((f) => f.estado_semana))];
   const estado = estados.includes("abierta") ? t("recibo.provisional") : estados.every((e) => e === "pagada") ? t("recibo.pagada") : t("recibo.cerrada");
   const provisional = estados.includes("abierta");
@@ -461,7 +461,7 @@ export async function vistaMiPago(el, ctx) {
   ]);
 
   const bloque = (f) => {
-    const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long" }); // pago: miércoles de cierre + 2
+    const viernes = fmtDia((semana.pago || sumarDias(semana.fin, 2)), { weekday: "long", day: "numeric", month: "long" }); // pago: miércoles de cierre + 2
     const estadoTexto = f.estado_semana === "abierta" ? t("pago.en_curso")
       : f.estado_semana === "cerrada" ? t("pago.cerrada", { dia: viernes }) : t("pago.pagada");
     return html`
@@ -490,7 +490,7 @@ export async function vistaMiPago(el, ctx) {
     ]);
     const neto = filas.reduce((a, f) => a + Number(f.neto), 0);
     const estados = [...new Set(filas.map((f) => f.estado_semana))];
-    const viernes = fmtDia(sumarDias(semana.fin, 2), { weekday: "long", day: "numeric", month: "long" });
+    const viernes = fmtDia((semana.pago || sumarDias(semana.fin, 2)), { weekday: "long", day: "numeric", month: "long" });
     const estadoTexto = estados.length !== 1 ? "" : estados[0] === "abierta" ? t("pago.en_curso")
       : estados[0] === "cerrada" ? t("pago.cerrada", { dia: viernes }) : t("pago.pagada");
     const activos = prestamos.filter((p) => p.activo && p.saldo > 0);
