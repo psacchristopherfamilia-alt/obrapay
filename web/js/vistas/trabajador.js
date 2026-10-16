@@ -8,6 +8,7 @@ import {
 } from "../ui.js";
 import { semanaActual, listaSemanas, rangoSemana, vigente, prestamosConSaldo } from "../datos.js";
 import { alSalirDeVista, recargarVista } from "../app.js";
+import { logoHtml, nombreMarca, tieneMarca, variablesDeMarca } from "../marca.js";
 
 const PILDORA = {
   abierto: ["pildora-info", "estado.abierto"],
@@ -377,7 +378,7 @@ export function recibo(filas, turnos, semana, ctx, trab = ctx.perfil) {
       <div class="rec-dos">
         <div><div class="etq">${t("recibo.ingresos")}</div><table><tbody>
           <tr><td>${t("recibo.normales", { h: horas(f.minutos_reg), tarifa: dinero(f.tarifa) })}</td><td class="der mono">${dinero(reg)}</td></tr>
-          <tr><td>${t("recibo.extra", { h: horas(f.minutos_extra), tarifa: dinero(f.tarifa) })}</td><td class="der mono">${dinero(ext)}</td></tr>
+          <tr><td>${t("recibo.extra", { h: horas(f.minutos_extra), tarifa: dinero(f.minutos_extra > 0 ? redondo(ext / (f.minutos_extra / 60)) : f.tarifa) })}</td><td class="der mono">${dinero(ext)}</td></tr>
           <tr class="tot"><td>${t("pago.bruto")}</td><td class="der mono">${dinero(f.bruto)}</td></tr></tbody></table></div>
         <div><div class="etq">${t("recibo.descuentos")}</div><table><tbody>
           <tr><td>NIB</td><td class="der mono">−${dinero(nib)}</td></tr>
@@ -389,10 +390,14 @@ export function recibo(filas, turnos, semana, ctx, trab = ctx.perfil) {
     </section>`;
   };
 
+  // Marca de la compañía en el recibo (solo cuando es de una sola compañía, que es la que está activa).
+  const marcaRecibo = tieneMarca(ctx.empresa) && filas.length === 1 && filas[0].empresa_id === ctx.empresa.id;
+  const vm = marcaRecibo ? variablesDeMarca(ctx.empresa.marca_color, false) : null;
+  const bandaMarca = vm ? { fondo: vm["--acento"], texto: vm["--sobre-acento"] } : null;
   return html`
     <article class="recibo-hoja">
-      <header class="rec-banda">
-        <div><div class="rec-emp">${filas.map((f) => f.empresa).join(" · ")}</div><div class="rec-sub">${t("recibo.titulo")}</div></div>
+      <header class="rec-banda" ${bandaMarca ? crudo(`style="background:${bandaMarca.fondo};color:${bandaMarca.texto}"`) : ""}>
+        <div class="rec-marca">${marcaRecibo ? crudo(logoHtml(ctx.empresa, "logo-marca logo-recibo")) : ""}<div><div class="rec-emp">${marcaRecibo && filas.length === 1 ? nombreMarca(ctx.empresa) : filas.map((f) => f.empresa).join(" · ")}</div><div class="rec-sub">${t("recibo.titulo")}</div></div></div>
         <div class="rec-doc"><b>${t("recibo.titulo_corto")}</b>${t("recibo.numero")} ${numero}<br><span class="rec-sello">${estado}</span></div>
       </header>
       <div class="rec-cuerpo">

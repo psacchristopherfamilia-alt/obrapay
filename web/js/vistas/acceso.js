@@ -1,16 +1,22 @@
 // Entrar y cambio obligatorio de contraseña.
 import { api } from "../api.js";
 import { t, idioma, fijarIdioma, IDIOMAS } from "../i18n.js";
-import { html, mensajeError, ocupado, aviso } from "../ui.js";
+import { html, crudo, mensajeError, ocupado, aviso } from "../ui.js";
+import { marcaGuardada, tieneMarca, logoHtml, nombreMarca } from "../marca.js";
+
+const cabAcceso = () => {
+  const m = marcaGuardada();
+  return m && tieneMarca(m) ? html`<div class="acceso-marca">${crudo(logoHtml(m))}<div class="marca-grande">${nombreMarca(m)}</div></div>` : html`<div class="marca-grande">ObraPay</div>`;
+};
 
 export function vistaEntrar(raiz, alEntrar, errorInicial = "") {
   const pintar = (error = "") => {
-    document.title = "ObraPay";
+    document.title = (() => { const m = marcaGuardada(); return m && tieneMarca(m) ? nombreMarca(m) : "ObraPay"; })();
     raiz.innerHTML = String(html`
       <div class="acceso">
         <form class="tarjeta-acceso" id="form-entrar" novalidate>
           <div class="acceso-cab">
-            <div class="marca-grande">ObraPay</div>
+            ${cabAcceso()}
             <label class="idioma"><span class="oculto">${t("comun.idioma")}</span>
               <select id="idioma-acceso" aria-label="${t("comun.idioma")}">
                 ${IDIOMAS.map(([c, n]) => html`<option value="${c}" ${c === idioma() ? html`selected` : ""}>${n}</option>`)}

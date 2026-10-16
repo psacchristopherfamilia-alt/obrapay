@@ -143,7 +143,7 @@ const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", dat
 // Supabase simulado
 // ---------------------------------------------------------------------------
 const RED = { caido: false };
-const ESTADO = { suspendida: false }; // true = la compañía está suspendida por falta de pago // true = sin señal: todas las llamadas a Supabase fallan
+const ESTADO = { suspendida: false, marca: null }; // true = la compañía está suspendida por falta de pago // true = sin señal: todas las llamadas a Supabase fallan
 function simulador(quien, llamadas) {
   const filtrar = (filas, qs) => {
     const p = new URLSearchParams(qs);
@@ -175,6 +175,9 @@ function simulador(quien, llamadas) {
     plataforma_guardar_empresa: (b) => { if (b.p_id) { const f = PL.filas.find((x) => x.empresa_id === b.p_id); Object.assign(f, { nombre: b.p_nombre, precio: b.p_precio, vence: b.p_vence }); return b.p_id; } PL.filas.push({ empresa_id: id("e7"), cliente_id: b.p_cliente, cliente: "Nuevo", telefono: null, email: null, nombre: b.p_nombre, licencia: null, precio: b.p_precio, vence: b.p_vence, suspendida: false, trabajadores: 0, obras: 0, vehiculos: 0 }); return id("e7"); },
     plataforma_pagos: () => PL.pagos,
     plataforma_pago: (b) => { const f = PL.filas.find((x) => x.empresa_id === b.p_empresa); f.vence = sumar(30); PL.suspendidas.delete(b.p_empresa); PL.pagos.unshift({ creado_en: new Date().toISOString(), monto: b.p_monto, vence_despues: f.vence }); return f.vence; },
+    plataforma_config: (b) => ({ empresa_id: b.p_empresa, nombre: "Compañía", extra_multiplicador: 1, extra_mult_desde: null, hora_extra_desde: "17:00", hora_cierre_turno: "23:00",
+      almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", marca_nombre: null, marca_color: null, marca_logo: null }),
+    plataforma_guardar_config: () => null,
     plataforma_suspender: (b) => { if (b.p_suspender) PL.suspendidas.add(b.p_empresa); else PL.suspendidas.delete(b.p_empresa); return null; },
     plataforma_entrar: () => { PL.asistiendo = true; quien.roles = ["admin"]; return null; },
     plataforma_salir: () => { PL.asistiendo = false; quien.roles = ["trabajador"]; return null; },
@@ -274,7 +277,7 @@ function simulador(quien, llamadas) {
   };
   const TABLAS = {
     perfiles: () => (quien.roles.includes("admin") || quien.roles.includes("dueno") ? Object.values(P) : [quien, ...(quien.roles.includes("supervisor") ? [P.juan, P.pedro] : [])]),
-    empresas: () => (ESTADO.suspendida ? [] : [EMP]), proyectos: () => PROY, semanas: () => SEM,
+    empresas: () => (ESTADO.suspendida ? [] : [{ ...EMP, ...(ESTADO.marca || {}) }]), proyectos: () => PROY, semanas: () => SEM,
     turnos: () => TURNOS.filter((x) => quien.roles.some((r) => ["admin", "dueno"].includes(r)) || x.perfil_id === quien.id || (quien.roles.includes("supervisor") && x.proyecto_id === id("f1"))),
     tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => (quien.roles.includes("admin") ? AVISOS_ADMIN : AVISOS),
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
@@ -1233,6 +1236,33 @@ await flujo("plataforma: registrar pago, suspender y activar", P.plat, 1360, asy
   esperar(ll.some((x) => x.ruta.endsWith("/plataforma_guardar_empresa") && x.cuerpo.p_id === id("e1") && x.cuerpo.p_precio === 450), "no guardó el precio editado");
 });
 
+await flujo("plataforma: configurar horas extra y marca de una compañía", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector(`[data-pl-config="${id("e1")}"]`);
+  await pg.click(`[data-pl-config="${id("e1")}"]`);
+  await pg.waitForSelector("#cf-mult");
+  // un multiplicador sin fecha no se guarda
+  await pg.fill("#cf-mult", "1.5");
+  await pg.click("dialog button[type=submit]");
+  esperar(!(await pg.locator("dialog .error-form").isHidden()), "no pidió la fecha del multiplicador");
+  esperar(!ll.some((x) => x.ruta.endsWith("/plataforma_guardar_config")), "guardó sin fecha");
+  await pg.fill("#cf-md", "2026-10-15");
+  // marca: nombre, color y vista previa con iniciales
+  await pg.click('[data-cfg-tab="marca"]');
+  await pg.fill("#cf-mn", "Constructora Prueba");
+  await pg.fill('dialog input[name=col]', "#1a73e8");
+  esperar((await pg.innerText("[data-cfg-vista]")).includes("Constructora Prueba"), "la vista previa no muestra el nombre");
+  esperar((await pg.innerText("[data-cfg-logo]")).trim() === "CP", "no usa las iniciales como logo");
+  await pg.screenshot({ path: `${CAPTURAS}/configurar-marca.png` });
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/plataforma_guardar_config"));
+  esperar(g && g.cuerpo.p_empresa === id("e1"), "no guardó la configuración");
+  esperar(g.cuerpo.p_cambios.extra_multiplicador === 1.5 && g.cuerpo.p_cambios.extra_mult_desde === "2026-10-15", "no mandó el multiplicador con su fecha");
+  esperar(g.cuerpo.p_cambios.marca_nombre === "Constructora Prueba" && g.cuerpo.p_cambios.marca_color === "#1a73e8" && g.cuerpo.p_cambios.marca_logo === null, "no mandó la marca");
+  esperar(g.cuerpo.p_cambios.almuerzo_inicio === "12:00" && g.cuerpo.p_cambios.hora_extra_desde === "17:00", "cambió lo que no debía");
+});
+
 await flujo("plataforma: asistente de alta con Excel, obras y vehículos", P.plat, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/plataforma`);
   await pg.waitForSelector("[data-pl-nueva]");
@@ -1311,6 +1341,25 @@ await flujo("compañía suspendida muestra el aviso y no entra", P.admin, 390, a
     esperar(txt.includes("suspendido") && txt.includes("mi empresa"), "no explica la suspensión");
     esperar(await pg.locator("#salir").count() === 0, "dejó ver el menú de la app");
   } finally { ESTADO.suspendida = false; }
+});
+
+await flujo("la marca de la compañía se ve en la app (nombre, color y iniciales) y con ObraPay por defecto", P.admin, 1360, async (pg) => {
+  await pg.goto(BASE);
+  await pg.waitForSelector(".marca");
+  esperar((await pg.innerText(".marca")).toLowerCase().includes("obrapay"), "sin marca debe decir ObraPay");
+  esperar((await pg.locator(".logo-marca").count()) === 0, "no debe haber logo sin marca");
+  ESTADO.marca = { marca_nombre: "Constructora Prueba", marca_color: "#1a73e8", marca_logo: null };
+  try {
+    await pg.goto(BASE);
+    await pg.reload();
+    await pg.waitForSelector(".marca-cia");
+    const txt = (await pg.innerText(".marca-cia")).toLowerCase();
+    esperar(txt.includes("constructora prueba") && txt.includes("cp"), "no muestra el nombre y las iniciales");
+    const acento = await pg.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--acento").trim());
+    esperar(acento.toLowerCase() === "#1a73e8", `el color de marca no se aplicó (${acento})`);
+    esperar((await pg.innerText(".hecho-con")).includes("ObraPay"), "falta Hecho con ObraPay");
+    await pg.screenshot({ path: `${CAPTURAS}/marca-aplicada.png` });
+  } finally { ESTADO.marca = null; }
 });
 
 await navegador.close();

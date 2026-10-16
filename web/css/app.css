@@ -138,6 +138,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); }
 .lateral-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .marca { font-family: var(--titulo); font-size: 32px; font-weight: 700; line-height: 1; text-transform: uppercase; display: flex; flex-direction: column; }
 .marca span { font-family: var(--sans); font-size: 13px; font-weight: 400; text-transform: none; color: var(--gris); margin-top: 4px; }
+/* marca de la compañía (logo o iniciales + nombre) */
+.logo-marca { width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: contain; background: var(--superficie); border: 1px solid var(--borde); }
+.logo-ini { display: grid; place-items: center; background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); font: 700 17px var(--titulo); letter-spacing: .02em; }
+.marca-cia { flex-direction: row; align-items: center; gap: 12px; min-width: 0; }
+.marca-cia .marca-txt { display: flex; flex-direction: column; font-size: 26px; min-width: 0; overflow-wrap: anywhere; }
+.marca-cia .marca-txt span:empty { display: none; }
+.cab-marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.cab-marca .marca-app { font-size: 26px; overflow-wrap: anywhere; }
+.acceso-marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.acceso-marca .marca-grande { font-size: 26px; overflow-wrap: anywhere; }
+.rec-marca { display: flex; align-items: center; gap: 12px; }
+.logo-recibo { width: 44px; height: 44px; }
+.hecho-con { margin: -6px 0 0; font-size: 11px; color: var(--gris); letter-spacing: .04em; }
 .nav-lista { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 4px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px; padding: 4px; box-shadow: var(--sombra); }
 .nav-item { color: var(--tinta); text-decoration: none; padding: 9px 6px; border-radius: 8px; font-weight: 600; font-size: 14px; min-height: 40px; display: flex; align-items: center; justify-content: center; text-align: center; }
 .nav-item:hover { background: var(--fondo-suave); color: var(--tinta); }
@@ -570,3 +583,17 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .suspendida-icono { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--arcilla-suave); color: var(--arcilla); }
 .suspendida-icono svg { width: 28px; height: 28px; }
 @media print { .banner-asistente, .titulo-vista .btn, .acciones, .lateral, .tabs, .cabecera { display: none !important; } }
+
+/* ---------- configurar compañía (panel de plataforma) ---------- */
+.cfg-tabs { display: flex; gap: 4px; background: var(--fondo-suave); border-radius: 10px; padding: 4px; flex-wrap: wrap; }
+.cfg-tabs button { flex: 1 1 auto; min-height: 36px; border: 0; background: transparent; border-radius: 8px; font: 600 13px var(--sans); color: var(--tinta); cursor: pointer; padding: 6px 10px; }
+.cfg-tabs button[aria-selected="true"] { background: var(--superficie); box-shadow: var(--sombra); }
+.cfg-panel { display: flex; flex-direction: column; gap: 14px; }
+.cfg-panel[hidden] { display: none; }
+.cfg-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.cfg-marca { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.cfg-marca .logo-marca { width: 64px; height: 64px; font-size: 22px; }
+.cfg-color { display: flex; align-items: center; gap: 10px; }
+.cfg-color input[type=color] { width: 44px; height: 36px; padding: 2px; border-radius: 8px; }
+.cfg-vista { border: 1px solid var(--borde); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; background: var(--superficie); }
+.cfg-vista .btn { pointer-events: none; }

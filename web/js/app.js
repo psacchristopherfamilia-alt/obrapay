@@ -20,7 +20,9 @@ import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
+import { aplicarYGuardar, aplicarMarcaGuardada, nombreMarca, logoHtml, tieneMarca } from "./marca.js";
 
+aplicarMarcaGuardada();
 const raiz = document.getElementById("app");
 export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [], tieneVehiculo: false, plataforma: false, asistiendo: false, asistida: null };
 
@@ -73,6 +75,7 @@ function cargarCtxGuardado(yo) {
     ctx.roles = c.perfil.roles || [];
     fijarIdioma(c.perfil.idioma);
     fijarZona(c.empresa?.zona_horaria);
+    aplicarYGuardar(c.empresa);
     return true;
   } catch { return false; }
 }
@@ -121,6 +124,7 @@ async function cargarContextoRed(yo) {
   }
   fijarIdioma(perfil.idioma);
   fijarZona(ctx.empresa.zona_horaria);
+  aplicarYGuardar(ctx.empresa);
 }
 
 function selectorIdioma(id) {
@@ -150,7 +154,9 @@ function marco(rutaActual) {
       <div class="escritorio">
         <div class="lateral">
           <header class="lateral-cab">
-            <div class="marca">ObraPay<span>${ctx.empresa.nombre}</span></div>
+            ${tieneMarca(ctx.empresa)
+              ? html`<div class="marca marca-cia">${crudo(logoHtml(ctx.empresa))}<div class="marca-txt">${nombreMarca(ctx.empresa)}<span>${ctx.empresa.marca_nombre && ctx.empresa.marca_nombre !== ctx.empresa.nombre ? ctx.empresa.nombre : ""}</span></div></div>`
+              : html`<div class="marca">ObraPay<span>${ctx.empresa.nombre}</span></div>`}
             <div class="lateral-pie">
               <div class="quien">${ctx.perfil.nombre}<span>${ctx.roles.map((r) => t(`rol.${r}`)).join(" · ")}</span></div>
               ${selectorEmpresa()}
@@ -159,6 +165,7 @@ function marco(rutaActual) {
             </div>
           </header>
           <nav class="nav-lista" aria-label="${t("comun.menu")}">${enlaces}</nav>
+          ${tieneMarca(ctx.empresa) ? html`<p class="hecho-con">${t("marca.hecho_con")}</p>` : ""}
         </div>
         <main id="vista" class="contenido" tabindex="-1"></main>
       </div>`;
@@ -166,7 +173,7 @@ function marco(rutaActual) {
   return html`
     <div class="movil">
       <header class="cabecera">
-        <div><div class="marca-app">ObraPay</div><p class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })}${ctx.empresas.length < 2 ? ` · ${ctx.empresa.nombre}` : ""}</p></div>
+        <div class="cab-marca">${crudo(logoHtml(ctx.empresa))}<div><div class="marca-app">${tieneMarca(ctx.empresa) ? nombreMarca(ctx.empresa) : "ObraPay"}</div><p class="hola">${t("comun.hola", { nombre: ctx.perfil.nombre.split(" ")[0] })}${ctx.empresas.length < 2 && !tieneMarca(ctx.empresa) ? ` · ${ctx.empresa.nombre}` : ""}</p></div></div>
         <div class="cab-acciones">
           ${selectorEmpresa()}
           ${selectorIdioma("idioma-app")}

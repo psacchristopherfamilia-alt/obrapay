@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { t } from "../i18n.js";
 import { html, esc, crudo, dinero, hoyLocal, sumarDias, fmtDia, aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, ICONO } from "../ui.js";
 import { recargarVista } from "../app.js";
+import { logoHtml, reducirLogo, variablesDeMarca, nombreMarca } from "../marca.js";
 import { leerXlsx, trabajadoresDeFilas, COLUMNAS_FECHA } from "../leer-xlsx.js";
 
 const dias = (ymd, hoy) => Math.round((Date.parse(`${ymd}T12:00:00Z`) - Date.parse(`${hoy}T12:00:00Z`)) / 864e5);
@@ -68,6 +69,7 @@ export async function vistaPlataforma(el, ctx) {
                   ? html`<button type="button" class="btn btn-sec btn-chico" data-pl-activar="${f.empresa_id}">${t("plat.activar")}</button>`
                   : html`<button type="button" class="btn btn-sec btn-chico" data-pl-suspender="${f.empresa_id}">${t("plat.suspender")}</button>`}
                 <button type="button" class="btn btn-sec btn-chico" data-pl-asistir="${f.empresa_id}">${t("plat.asistir")}</button>
+                <button type="button" class="btn btn-sec btn-chico" data-pl-config="${f.empresa_id}">${t("cfg.boton")}</button>
                 <button type="button" class="btn btn-sec btn-chico" data-pl-editar="${f.empresa_id}">${t("venc.editar")}</button></div></td></tr>`;
           })}</tbody></table></div></section>` : html`<div class="vacio">${t("plat.vacio")}</div>`}`;
   };
@@ -128,6 +130,96 @@ export async function vistaPlataforma(el, ctx) {
           await api.rpc("plataforma_guardar_empresa", { p_id: f.empresa_id, p_cliente: cli, p_nombre: form.en.value, p_licencia: form.el.value, p_direccion: null, p_precio: Number(form.ep.value || 0), p_vence: form.ev.value || null, p_zona: null });
         });
         cerrarModal(); aviso(t("plat.guardada")); await cargar(); pintar();
+      } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
+    });
+  };
+
+  // ---------- configurar compañía: horas extra, turno y marca ----------
+  const VARS_PREV = ["--acento", "--acento-osc", "--acento-suave", "--sobre-acento"];
+  const ZONAS = ["America/Grand_Turk", "America/Nassau", "America/New_York", "America/Santo_Domingo", "America/Port-au-Prince", "America/Jamaica", "America/Puerto_Rico"];
+  const modalConfig = async (f) => {
+    const c = await api.rpc("plataforma_config", { p_empresa: f.empresa_id });
+    const st = { color: c.marca_color || null, logo: c.marca_logo || null, nombre: c.marca_nombre || "", tab: "extra" };
+    const dlg = abrirModal(t("cfg.titulo", { nombre: f.nombre }), html`
+      <form class="form" novalidate>
+        <div class="cfg-tabs" role="tablist">
+          ${["extra", "turno", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "extra"}">${t(`cfg.tab_${k}`)}</button>`)}
+        </div>
+        <section class="cfg-panel" data-cfg-panel="extra">
+          <div class="campo"><label for="cf-hx">${t("cfg.extra_desde")}</label><input id="cf-hx" name="hx" type="time" value="${c.hora_extra_desde}" required></div>
+          <div class="cfg-fila">
+            <div class="campo"><label for="cf-mult">${t("cfg.mult")}</label><input id="cf-mult" name="mult" type="number" inputmode="decimal" min="1" max="3" step="0.05" value="${Number(c.extra_multiplicador)}"></div>
+            <div class="campo"><label for="cf-md">${t("cfg.mult_desde")}</label><input id="cf-md" name="md" type="date" value="${c.extra_mult_desde || ""}"></div>
+          </div>
+          <p class="sub">${t("cfg.mult_nota")}</p>
+        </section>
+        <section class="cfg-panel" data-cfg-panel="turno" hidden>
+          <div class="campo"><label for="cf-hc">${t("cfg.cierre")}</label><input id="cf-hc" name="hc" type="time" value="${c.hora_cierre_turno}" required></div>
+          <label class="check"><input type="checkbox" name="alm" ${c.almuerzo_inicio ? html`checked` : ""}> ${t("cfg.almuerzo")}</label>
+          <div class="cfg-fila" data-cfg-alm>
+            <div class="campo"><label for="cf-ai">${t("cfg.alm_ini")}</label><input id="cf-ai" name="ai" type="time" value="${c.almuerzo_inicio || "12:00"}"></div>
+            <div class="campo"><label for="cf-af">${t("cfg.alm_fin")}</label><input id="cf-af" name="af" type="time" value="${c.almuerzo_fin || "13:00"}"></div>
+          </div>
+          <div class="campo"><label for="cf-z">${t("cfg.zona")}</label>
+            <input id="cf-z" name="z" list="cf-zonas" value="${c.zona_horaria}" autocomplete="off"><datalist id="cf-zonas">${ZONAS.map((z) => html`<option value="${z}">`)}</datalist></div>
+        </section>
+        <section class="cfg-panel" data-cfg-panel="marca" hidden>
+          <div class="campo"><label for="cf-mn">${t("cfg.marca_nombre")}</label><input id="cf-mn" name="mn" maxlength="60" value="${c.marca_nombre || ""}" placeholder="${f.nombre}" autocomplete="off"></div>
+          <div class="campo"><span class="etiqueta">${t("cfg.color")}</span>
+            <div class="cfg-color"><input type="color" name="col" value="${c.marca_color || "#0F6468"}" aria-label="${t("cfg.color")}">
+              <label class="check"><input type="checkbox" name="colstd" ${c.marca_color ? "" : html`checked`}> ${t("cfg.color_std")}</label></div></div>
+          <div class="campo"><span class="etiqueta">${t("cfg.logo")}</span>
+            <div class="cfg-marca"><span data-cfg-logo></span>
+              <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" aria-label="${t("cfg.logo")}">
+              <button type="button" class="btn btn-sec btn-chico" data-cfg-quitar-logo>${t("cfg.quitar_logo")}</button></div>
+            <p class="sub">${t("cfg.logo_nota")}</p></div>
+          <div><span class="etiqueta">${t("cfg.vista")}</span><div class="cfg-vista" data-cfg-vista></div></div>
+        </section>
+        <p class="error-form" role="alert" hidden></p>
+        <div class="acciones-modal"><button type="button" class="btn btn-sec" data-cerrar>${t("comun.cancelar")}</button>
+          <button type="submit" class="btn btn-pri">${t("plat.guardar")}</button></div>
+      </form>`, { ancho: 560 });
+    const form = dlg.querySelector("form");
+    const err = form.querySelector(".error-form");
+    const pintarMarca = () => {
+      const m = { nombre: f.nombre, marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo };
+      form.querySelector("[data-cfg-logo]").innerHTML = logoHtml({ ...m, marca_nombre: m.marca_nombre || f.nombre });
+      const v = variablesDeMarca(st.color, false) || {};
+      form.querySelector("[data-cfg-vista]").innerHTML = String(html`${crudo(logoHtml({ ...m, marca_nombre: m.marca_nombre || f.nombre }))}
+        <b>${nombreMarca(m)}</b><span class="btn btn-pri btn-chico" ${crudo(v["--acento"] ? `style="background:${v["--acento"]};border-color:${v["--acento"]};color:${v["--sobre-acento"]}"` : "")}>${t("cfg.boton_ej")}</span>`);
+      // La vista previa usa el color elegido aunque la app todavía lleve el suyo.
+      ["[data-cfg-logo]", "[data-cfg-vista]"].forEach((q) => { const n = form.querySelector(q); VARS_PREV.forEach((k) => (v[k] ? n.style.setProperty(k, v[k]) : n.style.removeProperty(k))); });
+      form.querySelector("[data-cfg-quitar-logo]").hidden = !st.logo;
+    };
+    const verAlm = () => { form.querySelector("[data-cfg-alm]").hidden = !form.alm.checked; };
+    pintarMarca(); verAlm();
+    dlg.addEventListener("click", (ev) => {
+      const b = ev.target.closest("[data-cfg-tab]"); if (!b) return;
+      dlg.querySelectorAll("[data-cfg-tab]").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+      dlg.querySelectorAll("[data-cfg-panel]").forEach((p) => { p.hidden = p.dataset.cfgPanel !== b.dataset.cfgTab; });
+    });
+    form.alm.addEventListener("change", verAlm);
+    form.mn.addEventListener("input", pintarMarca);
+    form.col.addEventListener("input", () => { st.color = form.col.value; form.colstd.checked = false; pintarMarca(); });
+    form.colstd.addEventListener("change", () => { st.color = form.colstd.checked ? null : form.col.value; pintarMarca(); });
+    form.querySelector("[data-cfg-quitar-logo]").addEventListener("click", () => { st.logo = null; form.logo.value = ""; pintarMarca(); });
+    form.logo.addEventListener("change", async () => {
+      const a = form.logo.files[0]; if (!a) return; err.hidden = true;
+      try { st.logo = await reducirLogo(a); pintarMarca(); } catch { err.hidden = false; err.textContent = t("cfg.logo_error"); form.logo.value = ""; }
+    });
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault(); err.hidden = true;
+      const mult = Number(form.mult.value || 1);
+      if (!(mult >= 1 && mult <= 3)) { err.hidden = false; err.textContent = t("cfg.f_mult"); return; }
+      if (mult > 1 && !form.md.value) { err.hidden = false; err.textContent = t("cfg.f_mult_desde"); return; }
+      const cambios = {
+        hora_extra_desde: form.hx.value, extra_multiplicador: mult, extra_mult_desde: mult > 1 ? form.md.value : null,
+        hora_cierre_turno: form.hc.value, almuerzo_inicio: form.alm.checked ? form.ai.value : null, almuerzo_fin: form.alm.checked ? form.af.value : null,
+        zona_horaria: form.z.value.trim(), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
+      };
+      try {
+        await ocupado(form.querySelector("[type=submit]"), () => api.rpc("plataforma_guardar_config", { p_empresa: f.empresa_id, p_cambios: cambios }));
+        cerrarModal(); aviso(t("cfg.guardada"));
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
   };
@@ -416,6 +508,7 @@ export async function vistaPlataforma(el, ctx) {
         pintar();
       } else if (k.plQuitar) { const [l, i] = k.plQuitar.split(":"); d[l].splice(Number(i), 1); if (!d[l].length && l !== "trab") d[l].push(l === "obras" ? { nombre: "", direccion: "", presupuesto: "" } : { nombre: "", placa: "", tipo: "camioneta", conductor: "" }); pintar(); }
       else if (k.plPago) modalPago(filas.find((f) => f.empresa_id === k.plPago));
+      else if (k.plConfig) await modalConfig(filas.find((f) => f.empresa_id === k.plConfig));
       else if (k.plEditar) modalEditar(filas.find((f) => f.empresa_id === k.plEditar));
       else if (k.plSuspender) {
         const f = filas.find((x) => x.empresa_id === k.plSuspender);
