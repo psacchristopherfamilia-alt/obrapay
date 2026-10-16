@@ -15,16 +15,21 @@ import { vistaVencimientos } from "./vistas/vencimientos.js";
 import { vistaVehiculos } from "./vistas/vehiculos.js";
 import { vistaPresupuestos } from "./vistas/presupuestos.js";
 import { vistaCuadrillas } from "./vistas/cuadrillas.js";
+import { vistaPlataforma } from "./vistas/plataforma.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 
 const raiz = document.getElementById("app");
-export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [], tieneVehiculo: false };
+export const ctx = { perfil: null, empresa: null, empresas: [], ajustes: {}, roles: [], tieneVehiculo: false, plataforma: false, asistiendo: false, asistida: null };
+
+// Todas las compañías de la persona están suspendidas por falta de pago: no hay datos que mostrar, solo el aviso.
+class CuentaSuspendida extends Error { constructor(filas) { super("cuenta_suspendida"); this.filas = filas; } }
 
 // Rutas: [ruta, clave de texto, roles que la ven, función de la vista, solo con varias compañías, condición extra]
 const RUTAS = [
+  ["plataforma", "nav.plataforma", ["plataforma"], vistaPlataforma],
   ["reloj", "nav.reloj", ["trabajador"], vistaReloj],
   ["horas", "nav.horas", ["trabajador"], vistaMisHoras],
   ["pago", "nav.pago", ["trabajador"], vistaMiPago],
@@ -49,7 +54,7 @@ const RUTAS = [
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
 const rutasDe = (roles) => RUTAS.filter(([, , r, , multi, cond]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1) && (!cond || cond()));
-const esGerencia = () => ctx.roles.includes("admin") || ctx.roles.includes("dueno");
+const esGerencia = () => ctx.roles.some((r) => ["admin", "dueno", "plataforma"].includes(r));
 
 let limpiezas = [];
 export function alSalirDeVista(f) { limpiezas.push(f); }
@@ -84,19 +89,31 @@ async function cargarContexto() {
 }
 
 async function cargarContextoRed(yo) {
-  const [perfiles, empresas, misEmpresas, ajustes] = await Promise.all([
+  const [perfiles, empresas, misEmpresas, ajustes, plat] = await Promise.all([
     api.sel("perfiles", `select=id,empresa_id,usuario,nombre,oficio,roles,idioma,activo,debe_cambiar_clave&id=eq.${yo}`),
     api.sel("empresas", "select=*"),
     api.rpc("mis_empresas"),
     api.rpc("mis_ajustes_empresas"),
+    api.rpc("plataforma_yo").catch((e) => { if (e instanceof ApiError && e.status === 0) throw e; return []; }),
   ]);
   const perfil = perfiles[0];
   if (!perfil || !perfil.activo) throw new Error(t("err.inactivo"));
   ctx.perfil = perfil;
+  if (!empresas[0]) {
+    // Sin compañía visible: o está suspendida por falta de pago, o algo anda mal.
+    const cuenta = await api.rpc("mi_cuenta").catch(() => []);
+    if ((cuenta || []).some((c) => c.suspendida)) throw new CuentaSuspendida(cuenta);
+    throw new Error(t("err.sin_empresa"));
+  }
   ctx.empresa = empresas[0];
+  const py = (plat && plat[0]) || {};
+  ctx.plataforma = !!py.es_plataforma; ctx.asistiendo = !!py.asistiendo; ctx.asistida = py.empresa || null;
   ctx.empresas = misEmpresas || [];
   ctx.ajustes = Object.fromEntries((ajustes || []).map((x) => [x.empresa_id, x]));
   ctx.roles = perfil.roles || [];
+  // Dueño de la plataforma: tiene su panel; mientras ayuda a una compañía, trabaja como administrador de ella.
+  if (ctx.asistiendo) ctx.roles = ["admin", "plataforma"];
+  else if (ctx.plataforma) ctx.roles = [...ctx.roles, "plataforma"];
   // Quien maneja un vehículo asignado ve "Mi vehículo" para actualizar las millas.
   ctx.tieneVehiculo = false;
   if (!esGerencia() && ctx.roles.some((r) => ["trabajador", "supervisor"].includes(r))) {
@@ -163,6 +180,19 @@ function marco(rutaActual) {
     </div>`;
 }
 
+function pantallaSuspendida(filas) {
+  const vence = filas.map((f) => f.vence).filter(Boolean).sort()[0];
+  raiz.innerHTML = String(html`<div class="suspendida" role="alert">
+    <div class="suspendida-icono">${crudo(ICONO.alerta)}</div>
+    <h1>${t("susp.titulo")}</h1>
+    <p>${t("susp.texto")}</p>
+    <p class="sub">${filas.filter((f) => f.suspendida).map((f) => f.nombre).join(" · ")}${vence ? ` · ${t("susp.vence", { fecha: vence })}` : ""}</p>
+    <button type="button" class="btn btn-sec" id="susp-salir">${t("comun.salir")}</button>
+    <button type="button" class="btn btn-fantasma" id="susp-reintentar">${t("comun.reintentar")}</button></div>`);
+  raiz.querySelector("#susp-salir").addEventListener("click", (ev) => ocupado(ev.currentTarget, () => api.salir()));
+  raiz.querySelector("#susp-reintentar").addEventListener("click", () => { ctx.perfil = null; mostrar(); });
+}
+
 async function mostrar() {
   limpiar();
   cerrarModal();
@@ -171,6 +201,7 @@ async function mostrar() {
     raiz.innerHTML = `<div class="cargando-pantalla"><span class="girando grande"></span></div>`;
     try { await cargarContexto(); } catch (e) {
       ctx.perfil = null;
+      if (e instanceof CuentaSuspendida) { pantallaSuspendida(e.filas); return; }
       if (e instanceof ApiError && e.status === 0) {
         // Sin señal y sin datos guardados: no se cierra la sesión, se ofrece reintentar.
         raiz.innerHTML = String(html`<div class="error-vista" role="alert"><p>${mensajeError(e)}</p>
@@ -196,6 +227,16 @@ async function mostrar() {
   const [, clave, , vista] = rutas.find(([r]) => r === ruta);
   document.title = `${t(clave)} · ObraPay`;
   raiz.innerHTML = String(marco(ruta));
+  if (ctx.asistiendo) {
+    raiz.insertAdjacentHTML("afterbegin", String(html`<div class="banner-asistente" role="status"><span>${t("plat.ayudando", { nombre: ctx.asistida || ctx.empresa.nombre })}</span>
+      <button type="button" class="btn btn-chico" id="asistente-salir">${t("plat.salir_asistente")}</button></div>`));
+    raiz.querySelector("#asistente-salir").addEventListener("click", async (ev) => {
+      try {
+        await ocupado(ev.currentTarget, () => api.rpc("plataforma_salir"));
+        ctx.perfil = null; location.hash = "#/plataforma"; mostrar();
+      } catch (e) { aviso(mensajeError(e), "error"); }
+    });
+  }
   raiz.querySelector("#salir").addEventListener("click", async (ev) => {
     await ocupado(ev.currentTarget, () => api.salir());
   });

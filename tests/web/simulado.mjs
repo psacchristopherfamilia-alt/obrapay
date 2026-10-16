@@ -16,7 +16,7 @@ const SUPA = "https://pxsutkiiwqjevgfvvewb.supabase.co";
 // ---------------------------------------------------------------------------
 // Servidor estático
 // ---------------------------------------------------------------------------
-const TIPOS = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json", ".png": "image/png" };
+const TIPOS = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json", ".png": "image/png", ".xlsx": "application/octet-stream" };
 const servidor = createServer(async (req, res) => {
   const ruta = normalize(decodeURIComponent(req.url.split("?")[0])).replace(/^\/+/, "") || "index.html";
   try {
@@ -43,6 +43,7 @@ const P = {
   juan: { id: id("c1"), usuario: "juan.perez", nombre: "Juan Pérez", oficio: "Plomero", roles: ["trabajador"] },
   marie: { id: id("c2"), usuario: "marie.joseph", nombre: "Marie Joseph", oficio: "Electricista", roles: ["trabajador"] },
   pedro: { id: id("c5"), usuario: "pedro.santos", nombre: "Pedro Santos", oficio: "Carpintero", roles: ["trabajador"] },
+  plat: { id: id("p1"), usuario: "christopher", nombre: "Christopher", oficio: null, roles: ["trabajador"] },
   nuevo: { id: id("c9"), usuario: "nuevo.uno", nombre: "Nuevo Uno", oficio: "Ayudante", roles: ["trabajador"] },
 };
 Object.values(P).forEach((p) => Object.assign(p, { empresa_id: EMP.id, idioma: "es", activo: true, debe_cambiar_clave: false }));
@@ -141,7 +142,8 @@ const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", dat
 // ---------------------------------------------------------------------------
 // Supabase simulado
 // ---------------------------------------------------------------------------
-const RED = { caido: false }; // true = sin señal: todas las llamadas a Supabase fallan
+const RED = { caido: false };
+const ESTADO = { suspendida: false }; // true = la compañía está suspendida por falta de pago // true = sin señal: todas las llamadas a Supabase fallan
 function simulador(quien, llamadas) {
   const filtrar = (filas, qs) => {
     const p = new URLSearchParams(qs);
@@ -157,7 +159,26 @@ function simulador(quien, llamadas) {
     return r;
   };
   const CU = { asignados: new Set([P.juan.id, P.pedro.id]), dentro: {}, lista: [{ id: id("q1"), nombre: "Cuadrilla Plomería", supervisor_id: P.ramon.id, supervisor: P.ramon.nombre, miembros: [{ id: P.juan.id, nombre: P.juan.nombre }, { id: P.marie.id, nombre: P.marie.nombre }] }] };
+
+  const PL = quien.__pl || (quien.__pl = { asistiendo: false, suspendidas: new Set(), pagos: [], clienteN: 2,
+    filas: [
+      { empresa_id: id("e1"), cliente_id: id("k1"), cliente: "Familia Dueño", telefono: "649-555-0000", email: "dueno@ejemplo.com", nombre: "Mi empresa", licencia: "BL-1", precio: 500, vence: sumar(3), suspendida: false, trabajadores: 5, obras: 2, vehiculos: 2 },
+      { empresa_id: id("e2"), cliente_id: id("k1"), cliente: "Familia Dueño", telefono: "649-555-0000", email: "dueno@ejemplo.com", nombre: "Current Ltd", licencia: null, precio: 500, vence: sumar(-5), suspendida: false, trabajadores: 3, obras: 1, vehiculos: 0 }] });
+  const ES_PLAT = quien.id === P.plat.id;
   const RPC = {
+    plataforma_yo: () => [{ es_plataforma: ES_PLAT, asistiendo: PL.asistiendo, empresa: PL.asistiendo ? "Mi empresa" : null }],
+    mi_cuenta: () => (ESTADO.suspendida ? [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: true, vence: sumar(-10) }] : [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: false, vence: sumar(10) }]),
+    plataforma_panel: () => PL.filas.map((f) => ({ ...f, suspendida: PL.suspendidas.has(f.empresa_id) })),
+    plataforma_clientes: () => [{ id: id("k1"), nombre: "Familia Dueño", companias: 2 }],
+    plataforma_admins: () => [{ id: P.admin.id, nombre: "Administración", companias: "Mi empresa" }],
+    plataforma_guardar_cliente: (b) => b.p_id || id("k2"),
+    plataforma_guardar_empresa: (b) => { if (b.p_id) { const f = PL.filas.find((x) => x.empresa_id === b.p_id); Object.assign(f, { nombre: b.p_nombre, precio: b.p_precio, vence: b.p_vence }); return b.p_id; } PL.filas.push({ empresa_id: id("e7"), cliente_id: b.p_cliente, cliente: "Nuevo", telefono: null, email: null, nombre: b.p_nombre, licencia: null, precio: b.p_precio, vence: b.p_vence, suspendida: false, trabajadores: 0, obras: 0, vehiculos: 0 }); return id("e7"); },
+    plataforma_pagos: () => PL.pagos,
+    plataforma_pago: (b) => { const f = PL.filas.find((x) => x.empresa_id === b.p_empresa); f.vence = sumar(30); PL.suspendidas.delete(b.p_empresa); PL.pagos.unshift({ creado_en: new Date().toISOString(), monto: b.p_monto, vence_despues: f.vence }); return f.vence; },
+    plataforma_suspender: (b) => { if (b.p_suspender) PL.suspendidas.add(b.p_empresa); else PL.suspendidas.delete(b.p_empresa); return null; },
+    plataforma_entrar: () => { PL.asistiendo = true; quien.roles = ["admin"]; return null; },
+    plataforma_salir: () => { PL.asistiendo = false; quien.roles = ["trabajador"]; return null; },
+    plataforma_alta_datos: (b) => ({ obras: b.p_obras.length, vehiculos: b.p_vehiculos.length }),
     semana_actual: () => id("s2"),
     mis_empresas: () => MIS_EMPRESAS,
     mis_ajustes_empresas: () => MIS_EMPRESAS.map((e) => ({ empresa_id: e.id, zona_horaria: EMP.zona_horaria, hora_extra_desde: "17:00", almuerzo_inicio: "12:00", almuerzo_fin: "13:00", gps_activo: false, gps_modo: "marcar" })),
@@ -253,7 +274,7 @@ function simulador(quien, llamadas) {
   };
   const TABLAS = {
     perfiles: () => (quien.roles.includes("admin") || quien.roles.includes("dueno") ? Object.values(P) : [quien, ...(quien.roles.includes("supervisor") ? [P.juan, P.pedro] : [])]),
-    empresas: () => [EMP], proyectos: () => PROY, semanas: () => SEM,
+    empresas: () => (ESTADO.suspendida ? [] : [EMP]), proyectos: () => PROY, semanas: () => SEM,
     turnos: () => TURNOS.filter((x) => quien.roles.some((r) => ["admin", "dueno"].includes(r)) || x.perfil_id === quien.id || (quien.roles.includes("supervisor") && x.proyecto_id === id("f1"))),
     tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => (quien.roles.includes("admin") ? AVISOS_ADMIN : AVISOS),
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
@@ -294,6 +315,11 @@ function simulador(quien, llamadas) {
     }
     if (ruta.startsWith("/storage/v1/object/sign/")) return json(200, { signedURL: "/object/sign/documentos/x?token=t" });
     if (ruta.startsWith("/storage/v1/object/")) return json(200, { Key: "ok" });
+    if (ruta.startsWith("/functions/v1/crear-trabajador") && cuerpo?.accion === "crear_varios") {
+      return json(200, { resultados: cuerpo.trabajadores.map((w, i) => (w.nombre === "Falla Uno" ? { fila: i + 1, nombre: w.nombre, ok: false, error: "usuario repetido" } : { fila: i + 1, nombre: w.nombre, ok: true, usuario: w.nombre.toLowerCase().replace(/\s+/g, "."), clave_temporal: "sol-mar-" + (40 + i) })),
+        admin: cuerpo.admin?.nombre ? { ok: true, nombre: cuerpo.admin.nombre, usuario: "admin.nuevo", clave_temporal: "luz-rio-77" } : (cuerpo.admin?.perfil_id ? { ok: true, existente: true, nombre: "Administración", usuario: "admin" } : null),
+        dueno: cuerpo.dueno ? { ok: true, nombre: cuerpo.dueno.nombre, usuario: "dueno.nuevo", clave_temporal: "paz-sol-12" } : null });
+    }
     if (ruta.startsWith("/functions/v1/crear-trabajador")) return json(201, { perfil_id: id("c9"), usuario: cuerpo.usuario || "x", clave_temporal: "sol-mar-isla-42" });
     if (ruta.startsWith("/rest/v1/")) {
       const tabla = ruta.split("/").pop();
@@ -315,6 +341,8 @@ const RECORRIDOS = [
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas", "cuadrillas"], idiomas: ["es", "en", "ht"] },
   { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "cuadrillas", "contador", "ajustes"], idiomas: ["es", "en"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos", "mivehiculo"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.plat, ancho: 1360, alto: 900, rutas: ["plataforma"], idiomas: ["es", "en", "ht"] },
+  { quien: P.plat, ancho: 390, alto: 844, rutas: ["plataforma"], idiomas: ["es"], sufijo: "-movil" },
   { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
@@ -339,7 +367,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas|cos|cua)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas|cos|cua|plat|susp)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -1171,6 +1199,118 @@ await flujo("dueño ve el reporte del contador sin editar los datos", P.dueno, 1
   await pg.goto(`${BASE}#/contador`);
   await pg.waitForSelector("[data-bajar=nib]");
   esperar((await pg.locator("#editar-emp").count()) === 0, "el dueño ve el botón de editar datos del empleador");
+});
+
+
+await flujo("plataforma: registrar pago, suspender y activar", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector("[data-empresa]");
+  esperar((await pg.innerText("[data-k=activas]")).trim() === "2", "no cuenta las 2 compañías activas");
+  esperar((await pg.innerText("[data-k=ingreso]")).includes("1,000") || (await pg.innerText("[data-k=ingreso]")).includes("1000"), "no suma el ingreso mensual de 2 x 500");
+  // pago a la vencida
+  await pg.click(`[data-pl-pago="${id("e2")}"]`);
+  await pg.waitForSelector("#pg-monto");
+  await pg.fill("#pg-monto", "500");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_pago") && x.cuerpo.p_empresa === id("e2") && x.cuerpo.p_monto === 500), "no registró el pago");
+  esperar(!(await pg.innerText(`[data-empresa="${id("e2")}"]`)).toLowerCase().includes("vencida"), "sigue vencida tras el pago");
+  // suspender (con confirmación) y activar
+  await pg.click(`[data-pl-suspender="${id("e1")}"]`);
+  await pg.waitForSelector("dialog [data-ok], dialog .btn-pri, dialog .btn-peligro");
+  await pg.click("dialog .btn-peligro, dialog [data-ok]");
+  await pg.waitForSelector(`[data-pl-activar="${id("e1")}"]`);
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_suspender") && x.cuerpo.p_suspender === true && x.cuerpo.p_empresa === id("e1")), "no suspendió");
+  esperar((await pg.innerText("[data-k=activas]")).trim() === "1", "la suspendida sigue contando como activa");
+  await pg.click(`[data-pl-activar="${id("e1")}"]`);
+  await pg.waitForSelector(`[data-pl-suspender="${id("e1")}"]`);
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_suspender") && x.cuerpo.p_suspender === false), "no activó");
+  // editar precio
+  await pg.click(`[data-pl-editar="${id("e1")}"]`);
+  await pg.fill("#ed-ep", "450");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_guardar_empresa") && x.cuerpo.p_id === id("e1") && x.cuerpo.p_precio === 450), "no guardó el precio editado");
+});
+
+await flujo("plataforma: asistente de alta con Excel, obras y vehículos", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector("[data-pl-nueva]");
+  await pg.click("[data-pl-nueva]");
+  await pg.waitForSelector("#al-en");
+  // falta el nombre del dueño: no avanza
+  await pg.click("[data-pl-sig]");
+  esperar(!(await pg.locator("#al-error").isHidden()), "no pidió el nombre del dueño");
+  await pg.fill("#al-dn", "Carlos Constructor");
+  await pg.fill("#al-dt", "649-555-1111");
+  await pg.fill("#al-en", "Isla Build Ltd");
+  await pg.fill("#al-an", "Secretaria Isla");
+  await pg.check("#al-du");
+  await pg.waitForSelector("#al-dun");
+  await pg.click("[data-pl-sig]");
+  // trabajadores: sube el Excel (3 filas, una sin tarifa)
+  await pg.waitForSelector("#al-xlsx", { state: "attached" });
+  await pg.setInputFiles("#al-xlsx", new URL("./fixtures/trabajadores.xlsx", import.meta.url).pathname);
+  await pg.waitForSelector(".plat-fila-t");
+  esperar(await pg.locator(".plat-fila-t").count() === 3, "no leyó las 3 filas del Excel");
+  esperar((await pg.inputValue('[data-i="0"][data-c="nombre"]')) === "Luis Mora", "no leyó el nombre de la primera fila");
+  esperar((await pg.innerText(".plat-fila-t >> nth=0")).includes("NIB"), "no marcó que la fila trae NIB");
+  await pg.click("[data-pl-sig]");
+  esperar(!(await pg.locator("#al-error").isHidden()), "dejó avanzar con una fila sin tarifa");
+  await pg.fill('[data-i="2"][data-c="tarifa"]', "15");
+  await pg.click("[data-pl-sig]");
+  // obras
+  await pg.waitForSelector('[data-l="obras"]');
+  await pg.fill('[data-l="obras"][data-i="0"][data-c="nombre"]', "Torre Norte");
+  await pg.fill('[data-l="obras"][data-i="0"][data-c="presupuesto"]', "90000");
+  await pg.click("[data-pl-sig]");
+  // vehículos
+  await pg.waitForSelector('[data-l="vehiculos"]');
+  await pg.fill('[data-l="vehiculos"][data-i="0"][data-c="nombre"]', "Hilux 01");
+  await pg.selectOption('[data-l="vehiculos"][data-i="0"][data-c="conductor"]', "Luis Mora");
+  await pg.click("[data-pl-sig]");
+  // revisar y crear
+  await pg.waitForSelector("[data-pl-crear]");
+  esperar((await pg.innerText(".plat-resumen")).includes("Isla Build Ltd"), "el resumen no muestra la compañía");
+  await pg.click("[data-pl-crear]");
+  await pg.waitForSelector(".plat-claves");
+  const cv = ll.find((x) => x.ruta.includes("crear-trabajador") && x.cuerpo?.accion === "crear_varios");
+  esperar(cv && cv.cuerpo.trabajadores.length === 3 && cv.cuerpo.admin.nombre === "Secretaria Isla" && cv.cuerpo.dueno.nombre === "Carlos Constructor", "no mandó trabajadores, administrador y dueño");
+  esperar(cv.cuerpo.trabajadores[0].permiso_vence === "2027-03-15" && cv.cuerpo.trabajadores[0].nib === "NIB-5501", "no pasó NIB ni fecha del permiso");
+  const ad = ll.find((x) => x.ruta.endsWith("/plataforma_alta_datos"));
+  esperar(ad && ad.cuerpo.p_obras.length === 1 && ad.cuerpo.p_vehiculos.length === 1 && ad.cuerpo.p_vehiculos[0].conductor === "luis.mora", "no mandó obras y vehículos con el conductor ligado");
+  const tabla = await pg.innerText(".plat-claves");
+  esperar(tabla.includes("luis.mora") && tabla.includes("sol-mar-40") && tabla.includes("admin.nuevo") && tabla.includes("luz-rio-77") && tabla.includes("dueno.nuevo"), "la hoja de claves no muestra a todos");
+  esperar(await pg.locator("[data-pl-csv], [data-pl-copiar], [data-pl-imprimir]").count() === 3, "faltan los botones de entregar claves");
+  await pg.click("[data-pl-volver]");
+  await pg.waitForSelector("[data-empresa]");
+  esperar(await pg.locator("[data-empresa]").count() === 3, "la compañía nueva no aparece en el panel");
+});
+
+await flujo("plataforma: entrar como asistente muestra el aviso y permite salir", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector("[data-pl-asistir]");
+  await pg.click(`[data-pl-asistir="${id("e1")}"]`);
+  await pg.waitForSelector("dialog .btn-pri, dialog [data-ok]");
+  await pg.click("dialog .btn-pri, dialog [data-ok]");
+  await pg.waitForSelector(".banner-asistente", { timeout: 8000 });
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_entrar") && x.cuerpo.p_empresa === id("e1")), "no entró a la compañía");
+  esperar(await pg.locator('a[href="#/nomina"]').count() > 0, "como asistente no ve las pantallas del administrador");
+  await pg.click("#asistente-salir");
+  await pg.waitForSelector("[data-empresa]", { timeout: 8000 });
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_salir")), "no salió de la compañía");
+  esperar(await pg.locator(".banner-asistente").count() === 0, "el aviso de asistente sigue puesto");
+});
+
+await flujo("compañía suspendida muestra el aviso y no entra", P.admin, 390, async (pg) => {
+  ESTADO.suspendida = true;
+  try {
+    await pg.goto(BASE);
+    await pg.waitForSelector(".suspendida", { timeout: 8000 });
+    const txt = (await pg.innerText(".suspendida")).toLowerCase();
+    esperar(txt.includes("suspendido") && txt.includes("mi empresa"), "no explica la suspensión");
+    esperar(await pg.locator("#salir").count() === 0, "dejó ver el menú de la app");
+  } finally { ESTADO.suspendida = false; }
 });
 
 await navegador.close();
