@@ -160,7 +160,8 @@ function simulador(quien, llamadas) {
   };
   const CU = { asignados: new Set([P.juan.id, P.pedro.id]), dentro: {}, lista: [{ id: id("q1"), nombre: "Cuadrilla Plomería", supervisor_id: P.ramon.id, supervisor: P.ramon.nombre, miembros: [{ id: P.juan.id, nombre: P.juan.nombre }, { id: P.marie.id, nombre: P.marie.nombre }] }] };
 
-  const PL = quien.__pl || (quien.__pl = { asistiendo: false, suspendidas: new Set(), pagos: [], clienteN: 2,
+  const PL = quien.__pl || (quien.__pl = { asistiendo: false, suspendidas: new Set(), pagos: [], clienteN: 2, demoReinicios: 0,
+    respaldos: [{ id: id("r1"), creado_en: new Date(Date.now() - 6 * 3600e3).toISOString(), tipo: "auto", companias: 2, filas: 1250, tamano: 412000 }],
     filas: [
       { empresa_id: id("e1"), cliente_id: id("k1"), cliente: "Familia Dueño", telefono: "649-555-0000", email: "dueno@ejemplo.com", nombre: "Mi empresa", licencia: "BL-1", precio: 500, vence: sumar(3), suspendida: false, trabajadores: 5, obras: 2, vehiculos: 2 },
       { empresa_id: id("e2"), cliente_id: id("k1"), cliente: "Familia Dueño", telefono: "649-555-0000", email: "dueno@ejemplo.com", nombre: "Current Ltd", licencia: null, precio: 500, vence: sumar(-5), suspendida: false, trabajadores: 3, obras: 1, vehiculos: 0 }] });
@@ -168,7 +169,29 @@ function simulador(quien, llamadas) {
   const RPC = {
     plataforma_yo: () => [{ es_plataforma: ES_PLAT, asistiendo: PL.asistiendo, empresa: PL.asistiendo ? "Mi empresa" : null }],
     mi_cuenta: () => (ESTADO.suspendida ? [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: true, vence: sumar(-10) }] : [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: false, vence: sumar(10) }]),
-    plataforma_panel: () => PL.filas.map((f) => ({ ...f, suspendida: PL.suspendidas.has(f.empresa_id) })),
+    plataforma_panel: () => PL.filas.map((f) => ({ demo: false, ...f, suspendida: PL.suspendidas.has(f.empresa_id) })),
+    plataforma_crear_demo: () => { PL.filas.push({ empresa_id: id("e9"), cliente_id: null, cliente: null, telefono: null, email: null, nombre: "Constructora Demo", licencia: null, precio: 0, vence: "2099-12-31", suspendida: false, trabajadores: 10, obras: 3, vehiculos: 2, demo: true }); return id("e9"); },
+    plataforma_reiniciar_demo: () => { PL.demoReinicios += 1; return null; },
+    plataforma_respaldos: () => PL.respaldos,
+    plataforma_respaldar_ahora: () => { PL.respaldos.unshift({ id: id("r2"), creado_en: new Date().toISOString(), tipo: "manual", companias: 2, filas: 1260, tamano: 415000 }); return id("r2"); },
+    plataforma_respaldo: () => ({ creado_en: new Date().toISOString(), companias: {}, plataforma: {} }),
+    historial: (b) => {
+      const ahora = Date.now();
+      const todos = [
+        { id: id("v1"), empresa_id: id("e1"), empresa: "Mi empresa", tipo: "cambio_tarifa", detalle: { perfil: P.juan.id, antes: 17, despues: 18, desde: "2026-10-01" }, por: "Administración", sobre: "Juan Pérez", sem_inicio: null, sem_fin: null, creado_en: new Date(ahora - 3600e3).toISOString() },
+        { id: id("v2"), empresa_id: id("e1"), empresa: "Mi empresa", tipo: "semana_cerrada", detalle: { semana: id("s1") }, por: null, sobre: null, sem_inicio: "2026-10-01", sem_fin: "2026-10-07", creado_en: new Date(ahora - 2 * 3600e3).toISOString() },
+        { id: id("v3"), empresa_id: id("e2"), empresa: "Current Ltd", tipo: "cambio_tasa_estatutaria", detalle: { agencia: "NIB", desde: "2027-01-01", tasa_empleado: 6, tasa_empleador: 7, tope_mensual: 6500, dia_vencimiento: 16 }, por: "Plataforma", sobre: null, sem_inicio: null, sem_fin: null, creado_en: new Date(ahora - 3 * 3600e3).toISOString() },
+        { id: id("v4"), empresa_id: id("e1"), empresa: "Mi empresa", tipo: "algo_nuevo", detalle: {}, por: "Administración", sobre: null, sem_inicio: null, sem_fin: null, creado_en: new Date(ahora - 4 * 3600e3).toISOString() }];
+      return todos.filter((e) => (b.p_todas || !b.p_empresa ? (b.p_todas ? true : e.empresa_id === id("e1")) : e.empresa_id === b.p_empresa) && (!b.p_tipos || b.p_tipos.includes(e.tipo)));
+    },
+    exportar_todo: () => ({
+      empresa: { id: id("e1"), nombre: "Mi empresa" },
+      perfiles: [{ id: P.juan.id, empresa_id: id("e1"), usuario: "juan.perez", nombre: "Juan Pérez", oficio: "Plomero", roles: ["trabajador"], activo: true }],
+      turnos: [{ id: id("t9"), empresa_id: id("e1"), perfil_id: P.juan.id, proyecto_id: id("f1"), entrada: "2026-10-08T11:00:00+00:00", salida: "2026-10-08T20:00:00+00:00", estado: "aprobado", semana_id: id("s1") }],
+      semanas: [{ id: id("s1"), empresa_id: id("e1"), inicio: "2026-10-01", fin: "2026-10-07", estado: "cerrada" }],
+      proyectos: [{ id: id("f1"), empresa_id: id("f1"), nombre: "Villa Grace Bay" }],
+      nomina_semanal: [{ semana_id: id("s1"), empresa_id: id("e1"), perfil_id: P.juan.id, minutos_reg: 480, minutos_extra: 0, bruto: 144, neto: 130.5, anulada: false }],
+      eventos_admin: [], notificaciones: undefined }),
     plataforma_clientes: () => [{ id: id("k1"), nombre: "Familia Dueño", companias: 2 }],
     plataforma_admins: () => [{ id: P.admin.id, nombre: "Administración", companias: "Mi empresa" }],
     plataforma_guardar_cliente: (b) => b.p_id || id("k2"),
@@ -1294,6 +1317,82 @@ await flujo("plataforma: agregar un dueño de solo lectura a una compañía que 
   const c = ll.find((x) => x.ruta.includes("crear-trabajador") && x.cuerpo.dueno);
   esperar(c && c.cuerpo.empresa_id === id("e2") && c.cuerpo.trabajadores.length === 0 && c.cuerpo.dueno.nombre === "Robbie Armstrong", "no pidió crear el dueño en esa compañía");
   esperar((await pg.innerText("[data-us-claves]")).includes("dueno.nuevo"), "no muestra la clave");
+});
+
+await flujo("plataforma: crear y reiniciar la demostración, respaldos e historial", P.plat, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/plataforma`);
+  await pg.waitForSelector("[data-empresa]");
+  esperar((await pg.locator(".plat-demo").count()) === 0, "no debería haber demo todavía");
+  // crear la demo: no cuenta en las compañías activas ni en el ingreso
+  await pg.click("[data-pl-demo-crear]");
+  await pg.waitForSelector("dialog .btn-pri");
+  await pg.click("dialog .btn-pri");
+  await pg.waitForSelector(".plat-demo");
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_crear_demo")), "no creó la demo");
+  esperar((await pg.innerText(".plat-demo")).includes("DEMO") && (await pg.innerText(".plat-demo")).includes("Constructora Demo"), "la demo no se ve marcada");
+  esperar((await pg.innerText("[data-k=activas]")).trim() === "2", "la demo cuenta como compañía activa");
+  esperar((await pg.innerText("[data-k=ingreso]")).includes("1,000"), "la demo cambió el ingreso mensual");
+  esperar((await pg.locator("[data-pl-demo-crear]").count()) === 0, "sigue ofreciendo crear la demo");
+  esperar((await pg.locator("tr[data-empresa]").count()) === 2, "la demo no debe salir en la tabla de compañías reales");
+  // reiniciar con confirmación
+  await pg.click("[data-pl-demo-reiniciar]");
+  await pg.waitForSelector("dialog .btn-peligro");
+  await pg.click("dialog .btn-peligro");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_reiniciar_demo") && x.cuerpo.p_empresa === id("e9")), "no reinició la demo");
+  // respaldos: lista, crear ahora y descargar
+  esperar((await pg.locator("[data-pl-resp-bajar]").count()) === 1, "no lista el respaldo automático");
+  await pg.click("[data-pl-resp-ahora]");
+  await pg.waitForSelector("[data-pl-resp-bajar] >> nth=1");
+  esperar(ll.some((x) => x.ruta.endsWith("/plataforma_respaldar_ahora")), "no creó el respaldo");
+  const [bajada] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-pl-resp-bajar] >> nth=0")]);
+  esperar(/^obrapay-respaldo_\d{4}-\d{2}-\d{2}\.json$/.test(bajada.suggestedFilename()), `nombre raro del respaldo: ${bajada.suggestedFilename()}`);
+  // historial de todas las compañías, con filtro y selector de compañía
+  await pg.waitForSelector(".hist-ev");
+  esperar((await pg.locator(".hist-ev").count()) === 4, "el historial de todas debe traer 4 eventos");
+  const txt = await pg.innerText(".hist-lista");
+  esperar(txt.includes("Plataforma cambió las tasas de NIB") && txt.includes("Current Ltd"), "no muestra de qué compañía es cada cambio");
+  esperar(txt.includes("Empleado 6% · empleador 7%") && txt.includes("$6,500.00"), "no muestra el detalle de las tasas");
+  esperar(txt.includes("hizo un cambio (algo_nuevo)"), "un tipo desconocido debe verse con frase genérica");
+  await pg.click('[data-hist-f="ley"]');
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/historial") && Array.isArray(x.cuerpo.p_tipos) && x.cuerpo.p_tipos.includes("cambio_tasa_estatutaria")), "no filtró por tipo");
+  esperar((await pg.locator(".hist-ev").count()) === 1, "el filtro de ley debe dejar 1 evento");
+  await pg.selectOption("#hist-cia", id("e1"));
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/historial") && x.cuerpo.p_empresa === id("e1")), "no pidió el historial de una compañía");
+  await pg.selectOption("#hist-cia", "");
+  await pg.waitForTimeout(300);
+  await pg.screenshot({ path: `${CAPTURAS}/plataforma-demo-respaldos-historial.png`, fullPage: true });
+});
+
+await flujo("admin ve el historial de su compañía y exporta todos los datos", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/historial`);
+  await pg.waitForSelector(".hist-ev");
+  const txt = await pg.innerText(".hist-lista");
+  esperar(txt.includes("Administración cambió la tarifa de Juan Pérez") && txt.includes("$17.00 → $18.00 por hora"), "no cuenta el cambio de tarifa en palabras");
+  esperar(/El sistema cerró la semana .*1 oct.*7 oct/.test(txt), "no dice qué semana se cerró ni que fue el sistema");
+  esperar(!txt.includes("Current Ltd"), "el admin no debe ver otra compañía");
+  esperar(!ll.some((x) => x.ruta.endsWith("/historial") && x.cuerpo.p_todas), "el admin no debe pedir todas las compañías");
+  await pg.click('[data-hist-f="tarifas"]');
+  await pg.waitForTimeout(300);
+  esperar((await pg.locator(".hist-ev").count()) === 1, "el filtro de tarifas debe dejar 1 evento");
+  await pg.click('[data-hist-f="todo"]');
+  await pg.waitForTimeout(300);
+  let [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-hist-excel]")]);
+  esperar(/^obrapay-historial_\d{4}-\d{2}-\d{2}\.xlsx$/.test(d.suggestedFilename()), `nombre raro del historial: ${d.suggestedFilename()}`);
+  [d] = await Promise.all([pg.waitForEvent("download"), pg.click("[data-exportar-todo]")]);
+  esperar(/^obrapay-datos_.*_\d{4}-\d{2}-\d{2}\.xlsx$/.test(d.suggestedFilename()), `nombre raro del archivo de datos: ${d.suggestedFilename()}`);
+  esperar(ll.some((x) => x.ruta.endsWith("/exportar_todo")), "no pidió los datos a la base");
+  const bytes = (await readFile(await d.path())).length;
+  esperar(bytes > 1500, "el Excel de todos los datos salió vacío");
+  await pg.screenshot({ path: `${CAPTURAS}/historial-admin.png`, fullPage: true });
+});
+
+await flujo("dueño ve el historial", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/historial`);
+  await pg.waitForSelector(".hist-ev");
+  esperar((await pg.locator("[data-exportar-todo]").count()) === 1, "el dueño debe poder exportar sus datos");
 });
 
 await flujo("plataforma: asistente de alta con Excel, obras y vehículos", P.plat, 1360, async (pg, ll) => {

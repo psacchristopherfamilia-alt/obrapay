@@ -14,7 +14,7 @@ function letraCol(n) {
 }
 
 // estilos: 0 normal, 1 encabezado en negrita, 2 dinero, 3 número con 2 decimales, 4 total en negrita dinero
-const ESTILO = { texto: 0, numero: 3, dinero: 2, horas: 3 };
+const ESTILO = { texto: 0, numero: 3, dinero: 2, horas: 3, entero: 5 };
 
 // Hoja libre (para reproducir formularios): hoja.libre = filas; cada celda es un valor o { v, e } con e = "neg" (negrita),
 // "din" (dinero), "dinneg" (dinero en negrita), "num" (2 decimales). hoja.anchos = anchos de columna. Sin fila de encabezado fija.
@@ -77,12 +77,13 @@ const ESTILOS_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>
 <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="5">
+<cellXfs count="6">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>
+<xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 </cellXfs></styleSheet>`;
 
 // --- ZIP sin compresión ---

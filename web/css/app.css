@@ -602,3 +602,23 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 
 .cfg-ley { border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; min-width: 0; }
 .cfg-ley legend { font: 700 13px var(--sans); padding: 0 6px; }
+
+/* Fase C: historial de cambios, respaldos y compañía de demostración */
+.hist-selector { max-width: 320px; margin-bottom: 8px; }
+.hist-filtros { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.hist-lista { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; }
+.hist-ev { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; padding: 11px 0; border-top: 1px solid var(--borde); align-items: start; }
+.hist-ev:first-child { border-top: 0; }
+.hist-pto { width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; background: var(--acento); }
+.hist-pto.g-tarifas { background: var(--verde); }
+.hist-pto.g-semanas { background: var(--acento); }
+.hist-pto.g-ley { background: var(--arcilla-osc); }
+.hist-pto.g-gastos { background: var(--gris); }
+.hist-pto.g-config { background: var(--arcilla); }
+.hist-pto.g-gente { background: var(--borde-fuerte); }
+.hist-tit { font-weight: 600; }
+.hist-fecha { white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+@media (max-width: 520px) { .hist-ev { grid-template-columns: auto minmax(0, 1fr); } .hist-fecha { grid-column: 2; } }
+.plat-demo { border-color: var(--acento); background: var(--acento-suave); }
+.plat-demo-cab { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.nota-aviso { background: var(--ambar-suave); color: var(--tinta); border-radius: 10px; padding: 10px 12px; font-size: 13px; }

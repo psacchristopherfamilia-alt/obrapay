@@ -2,7 +2,9 @@
 // entrar a ayudar a una compañía y el asistente de alta (dueño, compañía, trabajadores, obras y vehículos).
 import { api } from "../api.js";
 import { t } from "../i18n.js";
-import { html, esc, crudo, dinero, hoyLocal, sumarDias, fmtDia, aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, ICONO } from "../ui.js";
+import { html, esc, crudo, dinero, hoyLocal, sumarDias, fmtDia, fmtFechaHora, fechaLocal, aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, ICONO } from "../ui.js";
+import { descargar } from "../xlsx.js";
+import { montarHistorial } from "./historial.js";
 import { recargarVista } from "../app.js";
 import { logoHtml, reducirLogo, variablesDeMarca, nombreMarca } from "../marca.js";
 import { leerXlsx, trabajadoresDeFilas, COLUMNAS_FECHA } from "../leer-xlsx.js";
@@ -21,11 +23,14 @@ const nuevoAlta = () => ({
 });
 
 export async function vistaPlataforma(el, ctx) {
-  let filas = []; let clientes = []; let admins = [];
+  let filas = []; let clientes = []; let admins = []; let respaldos = [];
   let modo = "panel"; // panel | alta | resultado
   let d = nuevoAlta();
 
-  const cargar = async () => { filas = await api.rpc("plataforma_panel", {}); };
+  const cargar = async () => {
+    filas = await api.rpc("plataforma_panel", {});
+    respaldos = await api.rpc("plataforma_respaldos", {}).catch(() => []);
+  };
   const cargarAlta = async () => { [clientes, admins] = await Promise.all([api.rpc("plataforma_clientes", {}), api.rpc("plataforma_admins", {})]); };
 
   // ---------- panel ----------
@@ -40,22 +45,31 @@ export async function vistaPlataforma(el, ctx) {
 
   const pintarPanel = () => {
     const hoy = hoyLocal();
-    const activas = filas.filter((f) => !f.suspendida);
+    const demo = filas.find((f) => f.demo);
+    const reales = filas.filter((f) => !f.demo);
+    const activas = reales.filter((f) => !f.suspendida);
     const porVencer = activas.filter((f) => f.vence && dias(f.vence, hoy) <= 7).length;
     const ingreso = activas.reduce((a, f) => a + Number(f.precio || 0), 0);
-    const trabajadores = filas.reduce((a, f) => a + Number(f.trabajadores || 0), 0);
+    const trabajadores = reales.reduce((a, f) => a + Number(f.trabajadores || 0), 0);
     return html`
       <div class="titulo-vista"><div><h1>${t("plat.titulo")}</h1><p class="sub">${t("plat.sub")}</p></div>
-        <button type="button" class="btn btn-pri" data-pl-nueva>${crudo(ICONO.mas)} ${t("plat.nueva")}</button></div>
+        <div class="acciones">${demo ? "" : html`<button type="button" class="btn btn-sec" data-pl-demo-crear>${t("plat.demo_crear")}</button>`}
+          <button type="button" class="btn btn-pri" data-pl-nueva>${crudo(ICONO.mas)} ${t("plat.nueva")}</button></div></div>
       <div class="kpis">
         <div class="kpi"><span class="sub">${t("plat.k_activas")}</span><span class="num" data-k="activas">${activas.length}</span></div>
         <div class="kpi"><span class="sub">${t("plat.k_trabajadores")}</span><span class="num">${trabajadores}</span></div>
         <div class="kpi"><span class="sub">${t("plat.k_ingreso")}</span><span class="num" data-k="ingreso">${dinero(ingreso)}</span></div>
         <div class="kpi"><span class="sub">${t("plat.k_por_vencer")}</span><span class="num">${porVencer}</span></div></div>
-      ${filas.length ? html`<section class="tarjeta"><h2 class="etiqueta">${t("plat.companias")}</h2>
+      ${demo ? html`<section class="tarjeta plat-demo"><div class="plat-demo-cab">
+          <div><b>${demo.nombre}</b> <span class="pildora pildora-aviso">${t("plat.demo")}</span>
+            <div class="sub">${t("plat.demo_info")} · ${t("plat.equipo", { t: demo.trabajadores, o: demo.obras, v: demo.vehiculos })}</div></div>
+          <div class="acciones-fila plat-acc">
+            <button type="button" class="btn btn-pri btn-chico" data-pl-asistir="${demo.empresa_id}">${t("plat.asistir")}</button>
+            <button type="button" class="btn btn-sec btn-chico" data-pl-demo-reiniciar="${demo.empresa_id}">${t("plat.demo_reiniciar")}</button></div></div></section>` : ""}
+      ${reales.length ? html`<section class="tarjeta"><h2 class="etiqueta">${t("plat.companias")}</h2>
         <div class="tabla-caja" tabindex="0" role="region" aria-label="${t("plat.companias")}"><table class="tabla plat-tabla">
           <thead><tr><th>${t("plat.c_compania")}</th><th>${t("plat.c_dueno")}</th><th>${t("plat.c_equipo")}</th><th>${t("plat.c_precio")}</th><th>${t("plat.c_vence")}</th><th>${t("plat.c_estado")}</th><th></th></tr></thead>
-          <tbody>${filas.map((f) => {
+          <tbody>${reales.map((f) => {
             const e = estadoDe(f, hoy);
             return html`<tr data-empresa="${f.empresa_id}"><td data-l="${t("plat.c_compania")}"><b>${f.nombre}</b>${f.licencia ? html`<div class="sub">${f.licencia}</div>` : ""}</td>
               <td data-l="${t("plat.c_dueno")}">${f.cliente || "—"}${f.telefono ? html`<div class="sub">${f.telefono}</div>` : ""}</td>
@@ -72,7 +86,28 @@ export async function vistaPlataforma(el, ctx) {
                 <button type="button" class="btn btn-sec btn-chico" data-pl-config="${f.empresa_id}">${t("cfg.boton")}</button>
                 <button type="button" class="btn btn-sec btn-chico" data-pl-usuario="${f.empresa_id}">${t("usr.boton")}</button>
                 <button type="button" class="btn btn-sec btn-chico" data-pl-editar="${f.empresa_id}">${t("venc.editar")}</button></div></td></tr>`;
-          })}</tbody></table></div></section>` : html`<div class="vacio">${t("plat.vacio")}</div>`}`;
+          })}</tbody></table></div></section>` : html`<div class="vacio">${t("plat.vacio")}</div>`}
+      ${pintarRespaldos()}
+      <section class="tarjeta"><h2 class="etiqueta">${t("hist.titulo")}</h2><p class="sub">${t("hist.sub_plat")}</p><div data-hist-plat></div></section>`;
+  };
+
+  const fmtTam = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const pintarRespaldos = () => {
+    const ultimoAuto = respaldos.find((r) => r.tipo === "auto");
+    const atrasado = ultimoAuto && Date.now() - Date.parse(ultimoAuto.creado_en) > 48 * 3600e3;
+    return html`<section class="tarjeta"><h2 class="etiqueta">${t("resp.titulo")}</h2>
+      <p class="sub">${t("resp.sub")}</p>
+      ${atrasado ? html`<p class="nota nota-aviso" role="alert">${t("resp.alerta")}</p>` : ""}
+      ${respaldos.length ? html`<div class="tabla-caja" tabindex="0" role="region" aria-label="${t("resp.titulo")}"><table class="tabla plat-tabla">
+        <thead><tr><th>${t("resp.c_fecha")}</th><th>${t("resp.c_tipo")}</th><th>${t("resp.c_contenido")}</th><th>${t("resp.c_tamano")}</th><th></th></tr></thead>
+        <tbody>${respaldos.map((r) => html`<tr><td data-l="${t("resp.c_fecha")}">${fmtFechaHora(r.creado_en)}</td>
+          <td data-l="${t("resp.c_tipo")}">${r.tipo === "manual" ? t("resp.manual") : t("resp.auto")}</td>
+          <td class="sub" data-l="${t("resp.c_contenido")}">${t("resp.contenido", { c: r.companias, f: r.filas })}</td>
+          <td class="num" data-l="${t("resp.c_tamano")}">${fmtTam(r.tamano)}</td>
+          <td><button type="button" class="btn btn-sec btn-chico" data-pl-resp-bajar="${r.id}">${crudo(ICONO.descarga)} ${t("resp.descargar")}</button></td></tr>`)}</tbody></table></div>`
+        : html`<p class="vacio">${t("resp.vacio")}</p>`}
+      <p class="nota">${t("resp.aviso")}</p>
+      <div class="acciones"><button type="button" class="btn btn-sec" data-pl-resp-ahora>${t("resp.ahora")}</button></div></section>`;
   };
 
   const modalPago = async (f) => {
@@ -545,6 +580,8 @@ export async function vistaPlataforma(el, ctx) {
   // ---------- general ----------
   const pintar = () => {
     el.innerHTML = String(modo === "alta" ? pintarAlta() : modo === "resultado" ? pintarResultado() : pintarPanel());
+    const h = modo === "panel" ? el.querySelector("[data-hist-plat]") : null;
+    if (h) montarHistorial(h, { todas: true, selector: filas.map((f) => ({ id: f.empresa_id, nombre: f.nombre })) });
   };
 
   const fijar = (ruta, valor) => {
@@ -614,6 +651,23 @@ export async function vistaPlataforma(el, ctx) {
         d[k.plAdd].push(k.plAdd === "obras" ? { nombre: "", direccion: "", presupuesto: "" } : { nombre: "", placa: "", tipo: "camioneta", conductor: "" });
         pintar();
       } else if (k.plQuitar) { const [l, i] = k.plQuitar.split(":"); d[l].splice(Number(i), 1); if (!d[l].length && l !== "trab") d[l].push(l === "obras" ? { nombre: "", direccion: "", presupuesto: "" } : { nombre: "", placa: "", tipo: "camioneta", conductor: "" }); pintar(); }
+      else if (k.plDemoCrear !== undefined) {
+        if (!(await confirmar(t("plat.demo_crear_t"), t("plat.demo_crear_txt"), { boton: t("plat.demo_crear") }))) return;
+        await ocupado(b, () => api.rpc("plataforma_crear_demo", {}));
+        aviso(t("plat.demo_creada")); await cargar(); pintar();
+      } else if (k.plDemoReiniciar) {
+        if (!(await confirmar(t("plat.demo_reiniciar_t"), t("plat.demo_reiniciar_txt"), { peligro: true, boton: t("plat.demo_reiniciar") }))) return;
+        await ocupado(b, () => api.rpc("plataforma_reiniciar_demo", { p_empresa: k.plDemoReiniciar }));
+        aviso(t("plat.demo_reiniciada")); await cargar(); pintar();
+      } else if (k.plRespAhora !== undefined) {
+        await ocupado(b, () => api.rpc("plataforma_respaldar_ahora", {}));
+        aviso(t("resp.creado")); await cargar(); pintar();
+      } else if (k.plRespBajar) {
+        const r = respaldos.find((x) => x.id === k.plRespBajar);
+        const datos = await ocupado(b, () => api.rpc("plataforma_respaldo", { p_id: k.plRespBajar }));
+        descargar(new Blob([JSON.stringify(datos)], { type: "application/json" }), `obrapay-respaldo_${fechaLocal(r?.creado_en || new Date().toISOString())}.json`);
+        aviso(t("resp.descargado"));
+      }
       else if (k.plPago) modalPago(filas.find((f) => f.empresa_id === k.plPago));
       else if (k.plUsuario) await modalUsuario(filas.find((f) => f.empresa_id === k.plUsuario));
       else if (k.plConfig) await modalConfig(filas.find((f) => f.empresa_id === k.plConfig));

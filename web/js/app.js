@@ -18,6 +18,7 @@ import { vistaCuadrillas } from "./vistas/cuadrillas.js";
 import { vistaPlataforma } from "./vistas/plataforma.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
+import { vistaHistorial } from "./vistas/historial.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 import { aplicarYGuardar, aplicarMarcaGuardada, nombreMarca, logoHtml, tieneMarca } from "./marca.js";
@@ -53,6 +54,7 @@ const RUTAS = [
   ["mivehiculo", "nav.mi_vehiculo", ["trabajador", "supervisor"], vistaVehiculos, false, () => ctx.tieneVehiculo && !esGerencia()],
   ["vencimientos", "nav.vencimientos", ["admin", "dueno"], vistaVencimientos],
   ["contador", "nav.contador", ["admin", "dueno"], vistaContador],
+  ["historial", "nav.historial", ["admin", "dueno"], vistaHistorial],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
 ];
 const rutasDe = (roles) => RUTAS.filter(([, , r, , multi, cond]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1) && (!cond || cond()));
