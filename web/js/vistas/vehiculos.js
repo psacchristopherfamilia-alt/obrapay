@@ -8,6 +8,7 @@ import {
 } from "../ui.js";
 import { subirDocumento, mensajeArchivo } from "../archivos.js";
 import { montarGasolina } from "./gasolina.js";
+import { montarCostos } from "./costos.js";
 
 // Documentos del vehículo y cuántos días antes empieza el aviso (igual que la base de datos).
 export const DOCS = { seguro_vehiculo: "veh.d_seguro", inspeccion_vehiculo: "veh.d_inspeccion", registro_vehiculo: "veh.d_registro" };
@@ -237,9 +238,16 @@ async function flota(el, ctx) {
 
   const tabsSeccion = () => html`<div class="segmentos" role="group" aria-label="${t("veh.titulo")}">
     <button type="button" class="seg ${seccion === "flota" ? "activo" : ""}" data-seccion="flota" aria-pressed="${seccion === "flota"}">${t("gas.seccion_flota")}</button>
-    <button type="button" class="seg ${seccion === "gas" ? "activo" : ""}" data-seccion="gas" aria-pressed="${seccion === "gas"}">${t("gas.titulo")}</button></div>`;
+    <button type="button" class="seg ${seccion === "gas" ? "activo" : ""}" data-seccion="gas" aria-pressed="${seccion === "gas"}">${t("gas.titulo")}</button>
+    <button type="button" class="seg ${seccion === "costos" ? "activo" : ""}" data-seccion="costos" aria-pressed="${seccion === "costos"}">${t("cos.seccion")}</button></div>`;
 
   const pintar = () => {
+    if (seccion === "costos") {
+      el.innerHTML = String(html`<div class="titulo-vista"><h1>${t("veh.titulo")}</h1>${esAdmin ? "" : html`<span class="pildora">${t("dueno.solo_lectura")}</span>`}</div>
+        ${tabsSeccion()}<div id="cos-box"></div>`);
+      montarCostos(el.querySelector("#cos-box"), ctx, { soloLectura: !esAdmin }).catch((e) => aviso(mensajeError(e), "error"));
+      return;
+    }
     if (seccion === "gas") {
       el.innerHTML = String(html`<div class="titulo-vista"><h1>${t("veh.titulo")}</h1>${esAdmin ? "" : html`<span class="pildora">${t("dueno.solo_lectura")}</span>`}</div>
         ${tabsSeccion()}<div id="gas-box"></div>`);

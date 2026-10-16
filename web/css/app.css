@@ -472,3 +472,27 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .gas-conductor .gas-tabla th, .gas-conductor .gas-tabla td { padding-inline: 6px; }
 @media (max-width: 720px) { .gas-dos { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .gas-acc { min-width: 0; } .gas-conductor .gas-acc .btn { display: block; width: 100%; margin: 4px 0; } }
+
+/* Costo por vehículo */
+.cos { display: grid; gap: 14px; min-width: 0; --cos-seg: var(--acento); --cos-gas: #c97a2b; --cos-man: #6b7f3a; }
+.cos-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-v { border: 1px solid var(--borde); background: var(--superficie); color: var(--tinta); padding: 8px 14px; border-radius: 99px; font: inherit; cursor: pointer; }
+.chip-v.activo { background: var(--tinta); color: var(--superficie); border-color: var(--tinta); }
+.cos-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.cos-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cos-nav b { min-width: 150px; text-align: center; }
+.cos-dos { display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px; }
+.cos-dos > * { min-width: 0; }
+.cos-total { font-size: 32px; font-weight: 600; }
+.cos-barra { display: flex; height: 16px; border-radius: 8px; overflow: hidden; background: var(--fondo-suave); margin: 12px 0; }
+.cos-barra i { display: block; }
+.cos-fila { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--borde); }
+.cos-punto { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; }
+.cos-hist { display: flex; align-items: flex-end; gap: 8px; height: 130px; margin-top: 8px; }
+.cos-hist > div { flex: 1; display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: end; gap: 4px; height: 100%; min-width: 0; }
+.cos-hist i { display: block; width: 100%; background: var(--borde); border-radius: 6px 6px 2px 2px; align-self: end; }
+.cos-hist .ahora i { background: var(--acento); }
+.cos-hist b, .cos-hist span { font-size: 12px; } .cos-hist span { color: var(--gris); }
+.cos-tabla { min-width: 520px; }
+.enlace { background: none; border: 0; padding: 0; color: var(--acento); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+@media (max-width: 720px) { .cos-dos { grid-template-columns: 1fr; } .cos-total { font-size: 28px; } .cos-nav b { min-width: 0; flex: 1; } }

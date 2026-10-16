@@ -133,7 +133,9 @@ const PLANES = [
   { id: id("p2"), empresa_id: EMP.id, vehiculo_id: id("v1"), nombre: "Rotación de llantas", cada_millas: 5000, cada_dias: null, ultimo_fecha: sumar(-30), ultimo_millas: 44000, activo: true },
   { id: id("p3"), empresa_id: EMP.id, vehiculo_id: id("v2"), nombre: "Frenos", cada_millas: 20000, cada_dias: null, ultimo_fecha: sumar(-30), ultimo_millas: 0, activo: true },
 ];
-const SERVICIOS = [{ id: id("sv1"), vehiculo_id: id("v1"), plan_id: id("p1"), nombre: "Cambio de aceite", fecha: sumar(-80), millas: 45900, costo: 92.5, notas: "Aceite 5W-30" }];
+const SERVICIOS = [{ id: id("sv1"), vehiculo_id: id("v1"), plan_id: id("p1"), nombre: "Cambio de aceite", fecha: sumar(-80), millas: 45900, costo: 92.5, notas: "Aceite 5W-30" },
+  { id: id("sv2"), vehiculo_id: id("v2"), plan_id: null, nombre: "Frenos", fecha: sumar(-2), millas: 1100, costo: 310, notas: null }];
+const SEGUROS_COSTO = [{ vehiculo_id: id("v1"), empresa_id: EMP.id, monto: 450, frecuencia: "trimestral", desde: sumar(-100) }];
 const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", datos: { antes: 17, despues: 18, desde: "2026-10-01" }, leida: false, creado_en: "2026-10-01T12:00:00Z" }];
 
 // ---------------------------------------------------------------------------
@@ -212,6 +214,7 @@ function simulador(quien, llamadas) {
     guardar_datos_empleador: () => null,
     guardar_vehiculo: (a) => a.p_id || id("v3"),
     presupuesto_resumen: () => PRESUPUESTO,
+    guardar_seguro_vehiculo: () => null,
     guardar_presupuesto: () => null,
     actualizar_nombre_legal: () => null,
     reporte_seguros: () => [
@@ -243,6 +246,7 @@ function simulador(quien, llamadas) {
     vehiculo_planes: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? PLANES : PLANES.filter((x) => VEHICULOS.find((v) => v.id === x.vehiculo_id)?.conductor_id === quien.id)),
     vehiculo_servicios: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? SERVICIOS : []),
     vehiculo_gasolina: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? GASOLINA : GASOLINA.filter((x) => x.perfil_id === quien.id)),
+    vehiculo_seguro_costo: () => (quien.roles.some((r) => ["admin", "dueno"].includes(r)) ? SEGUROS_COSTO : []),
     proyecto_supervisores: () => [{ empresa_id: EMP.id, proyecto_id: id("f1"), perfil_id: P.ramon.id, proyectos: PROY[0] }],
   };
   return async (route) => {
@@ -312,7 +316,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas|cos)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -688,6 +692,58 @@ await flujo("el conductor registra y corrige su gasolina", P.juan, 390, async (p
   await pg.click("dialog button[type=submit]");
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.ruta.endsWith("/corregir_gasolina") && x.cuerpo.p_total === 62), "no corrigió la carga");
+});
+
+await flujo("costo por vehículo: totales por semana y mes, y el admin edita el seguro", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector('[data-seccion="costos"]');
+  // cálculos puros
+  const calc = await pg.evaluate(async () => {
+    const m = await import("/js/vistas/costos.js");
+    const s = { monto: 450, frecuencia: "trimestral", desde: "2026-01-01" };
+    return {
+      jueves: m.inicioSemana("2026-10-16"), jueves2: m.inicioSemana("2026-10-15"), miercoles: m.inicioSemana("2026-10-14"),
+      anual: m.seguroAnual(s), mes: m.seguroPorMes(s),
+      mesCompleto: m.seguroEnPeriodo(s, m.periodo("2026-10-16", "mes", 0)),
+      mesParcial: m.seguroEnPeriodo({ ...s, desde: "2026-10-16" }, m.periodo("2026-10-16", "mes", 0)),
+      antes: m.seguroEnPeriodo({ ...s, desde: "2026-11-01" }, m.periodo("2026-10-16", "mes", 0)),
+      semana: m.seguroEnPeriodo(s, m.periodo("2026-10-16", "semana", 0)),
+    };
+  });
+  esperar(calc.jueves === "2026-10-15" && calc.jueves2 === "2026-10-15" && calc.miercoles === "2026-10-08", `la semana no va de jueves a miércoles: ${JSON.stringify(calc)}`);
+  esperar(calc.anual === 1800 && calc.mes === 150 && calc.mesCompleto === 150, "mal el seguro por mes");
+  esperar(Math.abs(calc.mesParcial - (150 * 16) / 31) < 0.001 && calc.antes === 0, "mal el seguro prorrateado");
+  esperar(Math.abs(calc.semana - (1800 / 365) * 7) < 0.001, "mal el seguro por semana");
+  await pg.click('[data-seccion="costos"]');
+  await pg.waitForSelector(".cos");
+  let txt = await pg.innerText("#vista");
+  esperar(txt.includes("Toda la flota") && txt.includes("Total de la semana") && txt.includes("Toyota Hilux 01") && txt.includes("Ford Transit"), "no muestra la flota por semana");
+  await pg.click('[data-cos-tipo="mes"]');
+  txt = await pg.innerText("#vista");
+  esperar(txt.includes("Total del mes") && txt.includes("$150.00"), "no muestra el total del mes con el seguro");
+  await pg.screenshot({ path: `${CAPTURAS}/costos-admin.png`, fullPage: true });
+  await pg.click(`.cos-chips [data-cos-veh="${id("v1")}"]`);
+  await pg.waitForSelector("[data-cos-seg]");
+  await pg.click("[data-cos-seg]");
+  await pg.fill("#cs-monto", "2400");
+  await pg.selectOption("#cs-frec", "anual");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/guardar_seguro_vehiculo"));
+  esperar(g && g.cuerpo.p_vehiculo === id("v1") && g.cuerpo.p_monto === 2400 && g.cuerpo.p_frecuencia === "anual" && /^\d{4}-\d{2}-\d{2}$/.test(g.cuerpo.p_desde), "datos mal enviados a guardar_seguro_vehiculo");
+  await pg.click('[data-cos-nav="-1"]');
+  esperar((await pg.innerText("#vista")).length > 0, "no navega al periodo anterior");
+});
+
+await flujo("dueño ve los costos por vehículo sin editar el seguro", P.dueno, 390, async (pg) => {
+  await pg.goto(`${BASE}#/vehiculos`);
+  await pg.waitForSelector('[data-seccion="costos"]');
+  await pg.click('[data-seccion="costos"]');
+  await pg.waitForSelector(".cos");
+  await pg.click(`.cos-chips [data-cos-veh="${id("v1")}"]`);
+  await pg.waitForSelector(".cos-fila");
+  esperar((await pg.locator("[data-cos-seg]").count()) === 0, "el dueño puede editar el seguro");
+  await pg.screenshot({ path: `${CAPTURAS}/costos-dueno-movil.png`, fullPage: true });
 });
 
 await flujo("admin revisa y guarda el presupuesto de una obra", P.admin, 1360, async (pg, ll) => {
