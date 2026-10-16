@@ -19,6 +19,8 @@ import { vistaPlataforma } from "./vistas/plataforma.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHistorial } from "./vistas/historial.js";
+import { vistaAyuda, botonAyuda, abrirAyuda, recorridoPendiente, iniciarRecorrido } from "./ayuda.js";
+import { vistaLegal, vistaAceptar, TERMINOS_VERSION } from "./vistas/legal.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
 import { pintarAvisos } from "./avisos.js";
 import { aplicarYGuardar, aplicarMarcaGuardada, nombreMarca, logoHtml, tieneMarca } from "./marca.js";
@@ -56,6 +58,7 @@ const RUTAS = [
   ["contador", "nav.contador", ["admin", "dueno"], vistaContador],
   ["historial", "nav.historial", ["admin", "dueno"], vistaHistorial],
   ["ajustes", "nav.ajustes", ["admin"], vistaAjustes],
+  ["ayuda", "nav.ayuda", ["trabajador", "supervisor", "admin", "dueno", "plataforma"], vistaAyuda],
 ];
 const rutasDe = (roles) => RUTAS.filter(([, , r, , multi, cond]) => r.some((x) => roles.includes(x)) && (!multi || ctx.empresas.length > 1) && (!cond || cond()));
 const esGerencia = () => ctx.roles.some((r) => ["admin", "dueno", "plataforma"].includes(r));
@@ -104,6 +107,7 @@ async function cargarContextoRed(yo) {
   const perfil = perfiles[0];
   if (!perfil || !perfil.activo) throw new Error(t("err.inactivo"));
   ctx.perfil = perfil;
+  ctx.terminosOk = false;
   if (!empresas[0]) {
     // Sin compañía visible: o está suspendida por falta de pago, o algo anda mal.
     const cuenta = await api.rpc("mi_cuenta").catch(() => []);
@@ -206,6 +210,8 @@ function pantallaSuspendida(filas) {
 async function mostrar() {
   limpiar();
   cerrarModal();
+  const pagina = location.hash.replace(/^#\/?/, "").split("?")[0];
+  if (pagina === "terminos" || pagina === "privacidad") { vistaLegal(raiz, pagina); return; }
   if (!api.sesion()) { vistaEntrar(raiz, iniciar); return; }
   if (!ctx.perfil) {
     raiz.innerHTML = `<div class="cargando-pantalla"><span class="girando grande"></span></div>`;
@@ -226,6 +232,14 @@ async function mostrar() {
   }
   if (ctx.perfil.debe_cambiar_clave) { vistaCambiarClave(raiz, ctx, () => { ctx.perfil.debe_cambiar_clave = false; mostrar(); }); return; }
 
+  if (!ctx.empresa.demo && ctx.terminosOk !== true) {
+    // Si no se puede consultar (sin señal o aún sin la función en la base), no se bloquea el trabajo.
+    let v = TERMINOS_VERSION;
+    try { v = await api.rpc("mi_aceptacion"); } catch { /* sin bloquear */ }
+    if (v !== TERMINOS_VERSION) { vistaAceptar(raiz, () => { ctx.terminosOk = true; mostrar(); }); return; }
+    ctx.terminosOk = true;
+  }
+
   const rutas = rutasDe(ctx.roles);
   if (!rutas.length) { raiz.innerHTML = `<p class="vacio">${esc(t("err.sin_rol"))}</p>`; return; }
   let ruta = location.hash.replace(/^#\/?/, "").split("?")[0];
@@ -234,6 +248,7 @@ async function mostrar() {
     ruta = rutas[0][0];
     history.replaceState(null, "", `#/${ruta}`);
   }
+  ctx.rutas = rutas.map(([r, c]) => [r, c]);
   const [, clave, , vista] = rutas.find(([r]) => r === ruta);
   document.title = `${t(clave)} · ObraPay`;
   raiz.innerHTML = String(marco(ruta));
@@ -247,6 +262,9 @@ async function mostrar() {
       } catch (e) { aviso(mensajeError(e), "error"); }
     });
   }
+  if (ctx.empresa.demo && !ctx.asistiendo) raiz.insertAdjacentHTML("afterbegin", String(html`<div class="banner-asistente" role="status"><span>${t("demo.banner")}</span></div>`));
+  raiz.insertAdjacentHTML("beforeend", botonAyuda(ruta));
+  raiz.querySelector(".btn-ayuda")?.addEventListener("click", () => abrirAyuda(ruta, t(clave)));
   raiz.querySelector("#salir").addEventListener("click", async (ev) => {
     await ocupado(ev.currentTarget, () => api.salir());
   });
@@ -270,6 +288,7 @@ async function mostrar() {
   try {
     await vista(el, ctx);
     try { await pintarAvisos(el, ctx); } catch { /* sin señal: los avisos esperan */ }
+    if (recorridoPendiente(ctx)) iniciarRecorrido(ctx);
   } catch (e) {
     if (!api.sesion()) return;
     el.innerHTML = String(html`<div class="error-vista" role="alert"><p>${mensajeError(e)}</p>

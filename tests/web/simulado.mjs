@@ -143,7 +143,7 @@ const AVISOS = [{ id: id("n1"), perfil_id: P.juan.id, tipo: "cambio_tarifa", dat
 // Supabase simulado
 // ---------------------------------------------------------------------------
 const RED = { caido: false };
-const ESTADO = { suspendida: false, marca: null }; // true = la compañía está suspendida por falta de pago // true = sin señal: todas las llamadas a Supabase fallan
+const ESTADO = { suspendida: false, marca: null, terminos: "2026-10-1", demo: false }; // true = la compañía está suspendida por falta de pago // true = sin señal: todas las llamadas a Supabase fallan
 function simulador(quien, llamadas) {
   const filtrar = (filas, qs) => {
     const p = new URLSearchParams(qs);
@@ -167,6 +167,8 @@ function simulador(quien, llamadas) {
       { empresa_id: id("e2"), cliente_id: id("k1"), cliente: "Familia Dueño", telefono: "649-555-0000", email: "dueno@ejemplo.com", nombre: "Current Ltd", licencia: null, precio: 500, vence: sumar(-5), suspendida: false, trabajadores: 3, obras: 1, vehiculos: 0 }] });
   const ES_PLAT = quien.id === P.plat.id;
   const RPC = {
+    mi_aceptacion: () => ESTADO.terminos,
+    aceptar_terminos: (b) => { ESTADO.terminos = b.p_version; return null; },
     plataforma_yo: () => [{ es_plataforma: ES_PLAT, asistiendo: PL.asistiendo, empresa: PL.asistiendo ? "Mi empresa" : null }],
     mi_cuenta: () => (ESTADO.suspendida ? [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: true, vence: sumar(-10) }] : [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: false, vence: sumar(10) }]),
     plataforma_panel: () => PL.filas.map((f) => ({ demo: false, ...f, suspendida: PL.suspendidas.has(f.empresa_id) })),
@@ -303,7 +305,7 @@ function simulador(quien, llamadas) {
   };
   const TABLAS = {
     perfiles: () => (quien.roles.includes("admin") || quien.roles.includes("dueno") ? Object.values(P) : [quien, ...(quien.roles.includes("supervisor") ? [P.juan, P.pedro] : [])]),
-    empresas: () => (ESTADO.suspendida ? [] : [{ ...EMP, ...(ESTADO.marca || {}) }]), proyectos: () => PROY, semanas: () => SEM,
+    empresas: () => (ESTADO.suspendida ? [] : [{ ...EMP, ...(ESTADO.marca || {}), ...(ESTADO.demo ? { demo: true } : {}) }]), proyectos: () => PROY, semanas: () => SEM,
     turnos: () => TURNOS.filter((x) => quien.roles.some((r) => ["admin", "dueno"].includes(r)) || x.perfil_id === quien.id || (quien.roles.includes("supervisor") && x.proyecto_id === id("f1"))),
     tarifas: () => TARIFAS, seguros: () => SEGUROS, notificaciones: () => (quien.roles.includes("admin") ? AVISOS_ADMIN : AVISOS),
     prestamos: () => PRESTAMOS, descuentos_prestamo: () => DESCUENTOS,
@@ -366,7 +368,7 @@ await mkdir(CAPTURAS, { recursive: true });
 const navegador = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 const fallas = [];
 const RECORRIDOS = [
-  { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
+  { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago", "ayuda"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas", "cuadrillas"], idiomas: ["es", "en", "ht"] },
   { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "cuadrillas", "contador", "ajustes"], idiomas: ["es", "en"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos", "mivehiculo"], idiomas: ["es"], sufijo: "-movil" },
@@ -377,12 +379,13 @@ const RECORRIDOS = [
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
   const ctx = await navegador.newContext({ viewport: { width: ancho, height: alto }, timezoneId: "Asia/Tokyo", locale: "es-US", serviceWorkers: "block" });
-  await ctx.addInitScript(([l, uid]) => {
+  await ctx.addInitScript(([l, uid, conTour]) => {
     if (sessionStorage.getItem("prueba.iniciada")) return;
     sessionStorage.setItem("prueba.iniciada", "1");
     localStorage.setItem("obrapay.idioma", l);
+    if (!conTour) localStorage.setItem(`obrapay.tour.${uid}`, "1");
     localStorage.setItem("obrapay.sesion", JSON.stringify({ access_token: "tok", refresh_token: "ref", expires_at: Math.floor(Date.now() / 1000) + 3600, user_id: uid }));
-  }, [lang, quien.id]);
+  }, [lang, quien.id, !!quien.conTour]);
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   await ctx.route(`${SUPA}/**`, simulador({ ...quien, idioma: lang }, llamadas));
   const pagina = await ctx.newPage();
@@ -1393,6 +1396,92 @@ await flujo("dueño ve el historial", P.dueno, 1360, async (pg) => {
   await pg.goto(`${BASE}#/historial`);
   await pg.waitForSelector(".hist-ev");
   esperar((await pg.locator("[data-exportar-todo]").count()) === 1, "el dueño debe poder exportar sus datos");
+});
+
+
+// ---- Fase D: ayuda, recorrido, términos y demo
+await flujo("ayuda: botón ? en cada pantalla y centro de ayuda", P.admin, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/nomina`);
+  await pg.waitForSelector(".btn-ayuda");
+  await pg.click(".btn-ayuda");
+  await pg.waitForSelector("dialog.modal[open]");
+  esperar((await pg.innerText("dialog.modal")).toLowerCase().includes("paso a paso"), "la ayuda no muestra el paso a paso");
+  await pg.click("dialog.modal [data-cerrar]");
+  await pg.goto(`${BASE}#/ayuda`);
+  await pg.waitForSelector(".ayuda-tema");
+  const todos = await pg.locator(".ayuda-tema").count();
+  esperar(todos > 8, `pocos temas de ayuda: ${todos}`);
+  await pg.fill("#ay-buscar", "préstamo");
+  await pg.waitForTimeout(150);
+  const filtrados = await pg.locator(".ayuda-tema").count();
+  esperar(filtrados >= 1 && filtrados < todos, `el buscador no filtró (${filtrados} de ${todos})`);
+  await pg.fill("#ay-buscar", "zzzzzz");
+  await pg.waitForTimeout(150);
+  esperar((await pg.locator(".ayuda-lista .vacio").count()) === 1, "no avisó que no hay temas");
+  esperar((await pg.locator("a[href='#/terminos']").count()) >= 1, "falta el enlace a los términos");
+  await pg.screenshot({ path: join(CAPTURAS, "ayuda-centro.png"), fullPage: true });
+});
+
+await flujo("recorrido guiado al primer ingreso", { ...P.juan, conTour: true }, 390, async (pg) => {
+  await pg.goto(BASE);
+  await pg.waitForSelector(".tour");
+  esperar((await pg.innerText(".tour")).toLowerCase().includes("paso 1 de 4"), "el recorrido no empieza en el paso 1 de 4");
+  await pg.click("[data-t=sig]");
+  await pg.waitForFunction(() => location.hash === "#/horas");
+  esperar((await pg.innerText(".tour")).toLowerCase().includes("paso 2 de 4"), "no pasó al paso 2");
+  await pg.waitForSelector(".tour-resalte");
+  await pg.screenshot({ path: join(CAPTURAS, "recorrido-paso2.png"), fullPage: true });
+  await pg.click("[data-t=atras]");
+  esperar((await pg.innerText(".tour")).toLowerCase().includes("paso 1 de 4"), "no volvió al paso 1");
+  await pg.click("[data-t=sig]"); await pg.click("[data-t=sig]"); await pg.click("[data-t=sig]");
+  await pg.waitForSelector("a[href='#/ayuda'].tour-resalte", { timeout: 3000 }).catch(() => {});
+  await pg.click("[data-t=sig]");
+  await pg.waitForSelector(".tour", { state: "detached" });
+  await pg.reload();
+  await pg.waitForSelector("#vista");
+  await pg.waitForTimeout(500);
+  esperar((await pg.locator(".tour").count()) === 0, "el recorrido volvió a salir después de terminarlo");
+});
+
+await flujo("términos: se piden al entrar y quedan aceptados", P.juan, 390, async (pg, ll) => {
+  ESTADO.terminos = null;
+  try {
+    await pg.goto(BASE);
+    await pg.waitForSelector("#form-aceptar");
+    esperar(await pg.locator("#form-aceptar button[type=submit]").isDisabled(), "Continuar debe estar apagado sin aceptar");
+    await pg.click("a[href='#/terminos']");
+    await pg.waitForSelector(".legal h1");
+    esperar((await pg.innerText(".legal")).toLowerCase().includes("precio y pago"), "no muestra los términos");
+    await pg.click("#legal-volver");
+    await pg.waitForSelector("#form-aceptar");
+    await pg.check("#acepto");
+    await pg.click("#form-aceptar button[type=submit]");
+    await pg.waitForSelector("#marcar, .tarjeta, #vista .tarjeta-reloj, #vista", { timeout: 5000 });
+    await pg.waitForFunction(() => !document.querySelector("#form-aceptar"));
+    const rpc = ll.find((x) => x.ruta.endsWith("/aceptar_terminos"));
+    esperar(rpc && rpc.cuerpo.p_version === "2026-10-1", "no registró la versión aceptada");
+    await pg.goto(`${BASE}#/privacidad`);
+    await pg.waitForSelector(".legal h1");
+    esperar((await pg.innerText(".legal h1")).toLowerCase().includes("privacidad"), "no muestra la política de privacidad");
+  } finally { ESTADO.terminos = "2026-10-1"; }
+});
+
+await flujo("probar demo desde la pantalla de entrada", P.admin, 390, async (pg, ll) => {
+  ESTADO.demo = true; ESTADO.terminos = null;
+  try {
+    await pg.goto(BASE);
+    await pg.evaluate(() => localStorage.removeItem("obrapay.sesion"));
+    await pg.goto(BASE + "?entrar");
+    await pg.waitForSelector("#demo-entrar");
+    await pg.click("#demo-entrar");
+    await pg.waitForSelector("#vista");
+    const tok = ll.find((x) => x.ruta === "/auth/v1/token");
+    esperar(tok && tok.cuerpo.email === "demo.obrapay@obrapay.local" && tok.cuerpo.password === "ObraPayDemo2026", "no entró con el usuario de la demo");
+    await pg.waitForSelector(".banner-asistente");
+    esperar((await pg.innerText(".banner-asistente")).includes("demostración"), "falta el aviso de que está en la demo");
+    esperar((await pg.locator("#form-aceptar").count()) === 0 && !ll.some((x) => x.ruta.endsWith("/mi_aceptacion")), "la demo no debe pedir términos");
+    await pg.screenshot({ path: join(CAPTURAS, "demo-entrada.png"), fullPage: true });
+  } finally { ESTADO.demo = false; ESTADO.terminos = "2026-10-1"; }
 });
 
 await flujo("plataforma: asistente de alta con Excel, obras y vehículos", P.plat, 1360, async (pg, ll) => {

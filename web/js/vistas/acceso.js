@@ -2,6 +2,7 @@
 import { api } from "../api.js";
 import { t, idioma, fijarIdioma, IDIOMAS } from "../i18n.js";
 import { html, crudo, mensajeError, ocupado, aviso } from "../ui.js";
+import { enlacesLegales } from "./legal.js";
 import { marcaGuardada, tieneMarca, logoHtml, nombreMarca } from "../marca.js";
 
 const cabAcceso = () => {
@@ -35,12 +36,20 @@ export function vistaEntrar(raiz, alEntrar, errorInicial = "") {
           </div>
           ${error ? html`<p class="error-form" role="alert">${error}</p>` : ""}
           <button class="btn btn-pri btn-grande" type="submit">${t("acceso.entrar")}</button>
+          <button class="btn btn-sec" type="button" id="demo-entrar">${t("acceso.demo")}</button>
           <p class="ayuda">${t("acceso.olvido")}</p>
+          ${enlacesLegales()}
         </form>
       </div>`);
     raiz.querySelector("#idioma-acceso").addEventListener("change", (ev) => {
       fijarIdioma(ev.target.value);
       pintar();
+    });
+    raiz.querySelector("#demo-entrar").addEventListener("click", async (ev) => {
+      try {
+        await ocupado(ev.currentTarget, () => api.entrar("demo.obrapay", "ObraPayDemo2026"));
+        alEntrar();
+      } catch { pintar(t("acceso.demo_no")); }
     });
     const form = raiz.querySelector("#form-entrar");
     form.addEventListener("submit", async (ev) => {

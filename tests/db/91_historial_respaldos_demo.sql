@@ -12,7 +12,7 @@ begin execute format('select count(*)::int from public.%I where empresa_id = $1'
 create or replace function pg_temp.cuenta_semanas(p_empresa uuid, p_estado text) returns int language sql security definer as $f$
   select count(*)::int from public.semanas where empresa_id = p_empresa and estado = p_estado $f$;
 create or replace function pg_temp.usuarios_demo() returns int language sql security definer as $f$
-  select count(*)::int from auth.users where email like '%@demo.invalid' $f$;
+  select count(*)::int from auth.users where email like '%@demo.invalid' or email = 'demo.obrapay@obrapay.local' $f$;
 create or replace function pg_temp.neto_negativo(p_empresa uuid) returns int language sql security definer as $f$
   select count(*)::int from public.nomina_semanal where empresa_id = p_empresa and neto <= 0 $f$;
 create or replace function pg_temp.ids_demo(p_empresa uuid) returns text language sql security definer as $f$

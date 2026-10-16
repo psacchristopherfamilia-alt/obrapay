@@ -622,3 +622,27 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .plat-demo { border-color: var(--acento); background: var(--acento-suave); }
 .plat-demo-cab { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
 .nota-aviso { background: var(--ambar-suave); color: var(--tinta); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+
+/* Fase D: ayuda, recorrido, términos */
+.btn-ayuda { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); z-index: 40; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--acento-osc); font: 700 20px var(--sans); box-shadow: var(--sombra); cursor: pointer; }
+.btn-ayuda:hover, .btn-ayuda:focus-visible { background: var(--acento); color: var(--sobre-acento); }
+.ayuda-que { font-size: 15px; margin: 0 0 8px; }
+.ayuda-sub { margin: 12px 0 4px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--gris); }
+.ayuda-pasos { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.ayuda-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.ayuda-tema { border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; background: var(--superficie); }
+.ayuda-tema summary { cursor: pointer; font-weight: 600; }
+.tour { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 120; width: min(440px, calc(100% - 32px)); background: var(--oscuro); color: var(--sobre-oscuro); border-radius: 14px; padding: 14px 16px; box-shadow: 0 10px 30px -8px rgba(0, 0, 0, .5); display: flex; flex-direction: column; gap: 8px; }
+.tour-paso { margin: 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--sobre-oscuro-2); }
+.tour-txt { margin: 0; font-size: 14px; }
+.tour-acc { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.tour-resalte { outline: 3px solid var(--arcilla-osc); outline-offset: 2px; border-radius: 10px; animation: tour-pulso 1.2s ease-in-out infinite; }
+@keyframes tour-pulso { 50% { outline-color: transparent; } }
+@media (prefers-reduced-motion: reduce) { .tour-resalte { animation: none; } }
+.legal { max-width: 720px; margin: 0 auto; padding: 24px max(16px, env(safe-area-inset-right, 0px)) 48px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.legal h2 { font-size: 16px; margin: 12px 0 2px; }
+.legal p { margin: 0; line-height: 1.55; }
+.legal-pie { margin: 0; font-size: 12px; text-align: center; color: var(--gris); }
+.casilla { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.casilla input { margin-top: 3px; }
+@media print { .btn-ayuda, .tour { display: none !important; } }
