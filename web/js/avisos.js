@@ -4,11 +4,12 @@ import { api } from "./api.js";
 import { t } from "./i18n.js";
 import { html, esc, crudo, dinero, fmtDia, ICONO } from "./ui.js";
 
-const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro", "documento_por_vencer", "mantenimiento_vehiculo"];
+const TIPOS = ["remesa_por_vencer", "semana_por_cerrar", "turnos_sin_aprobar", "tope_seguro", "documento_por_vencer", "mantenimiento_vehiculo", "presupuesto_umbral", "presupuesto_categoria"];
 const DOC_TIPOS = {
   permiso_trabajo: "venc.t_permiso", licencia_construccion: "venc.t_construccion", licencia_conducir: "venc.t_conducir",
   seguro_vehiculo: "venc.t_seguro", inspeccion_vehiculo: "venc.t_inspeccion", registro_vehiculo: "venc.t_registro",
 };
+const usd0 = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(n) || 0);
 const fecha = (d) => fmtDia(d, { day: "numeric", month: "short" });
 
 function texto(a) {
@@ -35,6 +36,12 @@ function texto(a) {
       const n = Number(d.dias);
       return [t(n < 0 ? "aviso.mant_atraso" : n === 0 ? "aviso.mant_hoy" : n === 1 ? "aviso.mant_manana" : "aviso.mant_dias", { ...x, n: Math.abs(n) }), "vehiculos"];
     }
+    case "presupuesto_umbral": {
+      const x = { obra: esc(d.obra), usado: d.usado, gastado: usd0(d.gastado), presupuesto: usd0(d.presupuesto) };
+      return [t(Number(d.nivel) >= 100 ? "aviso.pres_100" : "aviso.pres_nivel", x), "presupuestos"];
+    }
+    case "presupuesto_categoria":
+      return [t("aviso.pres_cat", { obra: esc(d.obra), categoria: t(`pres.cat_${d.categoria}`), exceso: usd0(d.exceso) }), "presupuestos"];
     default: return null;
   }
 }

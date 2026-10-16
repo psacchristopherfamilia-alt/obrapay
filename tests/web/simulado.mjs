@@ -102,6 +102,13 @@ const AVISOS_ADMIN = [
   { id: id("na4"), perfil_id: P.admin.id, tipo: "tope_seguro", datos: { agencia: "NIB", nombre: "Juan <b>Pérez</b>" }, leida: false, creado_en: "2026-10-14T13:00:00Z" },
   { id: id("na5"), perfil_id: P.admin.id, tipo: "documento_por_vencer", datos: { documento: "d1", doc_tipo: "permiso_trabajo", quien: "Marie <i>Joseph</i>", vence: "2026-11-05", dias: 20 }, leida: false, creado_en: "2026-10-15T13:00:00Z" },
   { id: id("na6"), perfil_id: P.admin.id, tipo: "mantenimiento_vehiculo", datos: { plan: "p1", servicio: "Cambio de <u>aceite</u>", quien: "Toyota Hilux 01 · TCI 4821", por: "fecha", dias: 10 }, leida: false, creado_en: "2026-10-15T13:10:00Z" },
+  { id: id("na7"), perfil_id: P.admin.id, tipo: "presupuesto_umbral", datos: { proyecto: id("f1"), obra: "Villa <s>Grace</s> Bay", nivel: 75, usado: 82, gastado: 34400, presupuesto: 42000, avance: 60 }, leida: false, creado_en: "2026-10-15T13:15:00Z" },
+  { id: id("na8"), perfil_id: P.admin.id, tipo: "presupuesto_categoria", datos: { proyecto: id("f1"), obra: "Villa Grace Bay", categoria: "materiales", exceso: 400 }, leida: false, creado_en: "2026-10-15T13:15:00Z" },
+];
+const PRESUPUESTO = [
+  { proyecto_id: id("f1"), proyecto: "Villa Grace Bay", tiene: true, avance: 60, p_mano_obra: 18000, p_materiales: 15000, p_herramientas: 3000, p_subcontratos: 6000, r_mano_obra: 13900, r_materiales: 15400, r_herramientas: 1100, r_subcontratos: 5200 },
+  { proyecto_id: id("f2"), proyecto: "Leeward Plaza", tiene: true, avance: 45, p_mano_obra: 12000, p_materiales: 9000, p_herramientas: 2000, p_subcontratos: 5000, r_mano_obra: 6100, r_materiales: 3900, r_herramientas: 600, r_subcontratos: 1500 },
+  { proyecto_id: id("f3"), proyecto: "Taylor Bay Residence", tiene: false, avance: 0, p_mano_obra: 0, p_materiales: 0, p_herramientas: 0, p_subcontratos: 0, r_mano_obra: 2400, r_materiales: 800, r_herramientas: 0, r_subcontratos: 0 },
 ];
 const sumar = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 const DOCUMENTOS = [
@@ -198,6 +205,8 @@ function simulador(quien, llamadas) {
     datos_empleador: (a) => [{ empresa_id: a.p_empresa, nombre: a.p_empresa === EMP2.id ? EMP2.nombre : EMP.nombre, nib_registro: "REG-123", nib_seguro: null, direccion: null, apartado: null, telefono: null }],
     guardar_datos_empleador: () => null,
     guardar_vehiculo: (a) => a.p_id || id("v3"),
+    presupuesto_resumen: () => PRESUPUESTO,
+    guardar_presupuesto: () => null,
     actualizar_nombre_legal: () => null,
     reporte_seguros: () => [
       { semana_id: id("s1"), inicio: "2026-10-01", fin: "2026-10-07", pago: "2026-10-09", nro: 2, perfil_id: P.juan.id, apellido: "Pérez", nombre: "Juan", inicial: null, nombre_completo: "Juan Pérez",
@@ -268,9 +277,9 @@ const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
   { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "vehiculos", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
-  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "vehiculos", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
-  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos"], idiomas: ["es"], sufijo: "-movil" },
+  { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
 
 async function nuevaPagina(quien, ancho, alto, lang, llamadas) {
@@ -294,7 +303,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -597,6 +606,45 @@ await flujo("un trabajador sin vehículo no ve Mi vehículo", P.marie, 390, asyn
   esperar((await pg.locator('a[href="#/mivehiculo"]').count()) === 0, "Marie ve una pestaña de vehículo sin tener uno");
 });
 
+await flujo("admin revisa y guarda el presupuesto de una obra", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/presupuestos`);
+  await pg.waitForSelector(`tr[data-obra="${id("f1")}"]`);
+  const tabla = await pg.innerText(".pres-tabla");
+  esperar(tabla.includes("Villa Grace Bay") && tabla.includes("$42,000") && tabla.includes("Revisar") && tabla.includes("Sin presupuesto"), "la tabla no muestra presupuesto, estado y obra sin presupuesto");
+  esperar(tabla.includes("Va bien"), "Leeward Plaza debe ir bien");
+  await pg.waitForSelector("#pres-detalle");
+  const det = await pg.innerText("#pres-detalle");
+  esperar(det.includes("Materiales va $400 sobre el presupuesto") && det.includes("te pasaste $400"), "el detalle no marca la categoría pasada");
+  // otra obra y edición
+  await pg.click(`tr[data-obra="${id("f3")}"]`);
+  await pg.waitForSelector("#pres-form");
+  await pg.fill("#pf-mano_obra", "8000");
+  await pg.fill("#pf-materiales", "6000");
+  esperar((await pg.innerText("#pf-total")).includes("$14,000"), "el total del formulario no se actualiza");
+  await pg.fill("#pf-avance", "40");
+  await pg.click("#pres-form button[type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/guardar_presupuesto"));
+  esperar(g && g.cuerpo.p_proyecto === id("f3") && g.cuerpo.p_mano_obra === 8000 && g.cuerpo.p_materiales === 6000 && g.cuerpo.p_herramientas === 0 && g.cuerpo.p_avance === 40, "datos mal enviados a guardar_presupuesto");
+  // monto negativo
+  await pg.fill("#pf-materiales", "-5");
+  await pg.click("#pres-form button[type=submit]");
+  await pg.waitForTimeout(200);
+  esperar((await pg.locator("#pres-form .error-form").innerText()).length > 0 && ll.filter((x) => x.ruta.endsWith("/guardar_presupuesto")).length === 1, "aceptó un monto negativo");
+});
+
+await flujo("dueño ve los presupuestos sin poder editarlos", P.dueno, 1360, async (pg) => {
+  await pg.goto(`${BASE}#/presupuestos`);
+  await pg.waitForSelector(`tr[data-obra="${id("f1")}"]`);
+  esperar((await pg.locator("#pres-form").count()) === 0, "el dueño ve el formulario del presupuesto");
+});
+
+await flujo("el supervisor no ve Presupuestos", P.ramon, 390, async (pg) => {
+  await pg.goto(`${BASE}#/`);
+  await pg.waitForTimeout(800);
+  esperar((await pg.locator('a[href="#/presupuestos"]').count()) === 0, "el supervisor ve Presupuestos");
+});
+
 await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/trabajadores`);
   await pg.click("#nuevo");
@@ -701,13 +749,13 @@ await flujo("admin ve y descarta sus avisos", P.admin, 1360, async (pg, ll) => {
   await pg.goto(`${BASE}#/nomina`);
   await pg.waitForSelector(".avisos-admin");
   const txt = await pg.innerText(".avisos-admin");
-  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB") && txt.includes("Permiso de trabajo · Marie") && txt.includes("vence en 20 días") && txt.includes("Cambio de <u>aceite</u> · Toyota Hilux 01") && txt.includes("toca en 10 días"), "faltan avisos del admin");
-  esperar(!(await pg.innerHTML(".avisos-admin")).includes("<u>"), "el servicio del aviso no se escapó");
+  esperar(txt.includes("NHIP vence el") && txt.includes("La semana cierra hoy") && txt.includes("3 turnos sin aprobar") && txt.includes("llegó al tope mensual de NIB") && txt.includes("Permiso de trabajo · Marie") && txt.includes("vence en 20 días") && txt.includes("Cambio de <u>aceite</u> · Toyota Hilux 01") && txt.includes("toca en 10 días") && txt.includes("ya usó el 82% de su presupuesto") && txt.includes("Materiales se pasó por $400"), "faltan avisos del admin");
+  esperar(!(await pg.innerHTML(".avisos-admin")).includes("<u>") && !(await pg.innerHTML(".avisos-admin")).includes("<s>"), "el texto del aviso no se escapó");
   esperar(!(await pg.innerHTML(".avisos-admin")).includes("<b>"), "el nombre del aviso no se escapó");
   await pg.click(`[data-leido="${id("na3")}"]`);
   await pg.waitForTimeout(300);
   esperar(ll.some((x) => x.metodo === "PATCH" && x.ruta.endsWith("/notificaciones")), "no marcó el aviso como leído");
-  esperar((await pg.locator("[data-aviso]").count()) === 5, "no quitó el aviso descartado");
+  esperar((await pg.locator("[data-aviso]").count()) === 7, "no quitó el aviso descartado");
 });
 
 await flujo("admin valida la tasa antes de guardar", P.admin, 1360, async (pg, ll) => {

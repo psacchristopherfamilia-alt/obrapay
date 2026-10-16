@@ -13,6 +13,7 @@ import { vistaResumen } from "./vistas/dueno.js";
 import { vistaSeguros } from "./vistas/seguros.js";
 import { vistaVencimientos } from "./vistas/vencimientos.js";
 import { vistaVehiculos } from "./vistas/vehiculos.js";
+import { vistaPresupuestos } from "./vistas/presupuestos.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
@@ -38,6 +39,7 @@ const RUTAS = [
   ["companias", "nav.companias", ["admin", "dueno"], vistaCompanias, true],
   ["reportes", "nav.reportes", ["admin", "dueno"], vistaReportes],
   ["seguros", "nav.seguros", ["admin", "dueno"], vistaSeguros],
+  ["presupuestos", "nav.presupuestos", ["admin", "dueno"], vistaPresupuestos],
   ["vehiculos", "nav.vehiculos", ["admin", "dueno"], vistaVehiculos],
   ["mivehiculo", "nav.mi_vehiculo", ["trabajador", "supervisor"], vistaVehiculos, false, () => ctx.tieneVehiculo && !esGerencia()],
   ["vencimientos", "nav.vencimientos", ["admin", "dueno"], vistaVencimientos],
