@@ -5,7 +5,7 @@ const NUCLEO = [
   "css/app.css",
   "js/api.js", "js/app.js", "js/archivos.js", "js/avisos.js", "js/cola.js", "js/contador.js", "js/datos.js", "js/i18n.js", "js/ui.js", "js/xlsx.js",
   "js/vistas/acceso.js", "js/vistas/admin.js", "js/vistas/companias.js", "js/vistas/contador.js", "js/vistas/dueno.js",
-  "js/vistas/herramientas.js", "js/vistas/seguros.js", "js/vistas/vehiculos.js", "js/vistas/presupuestos.js", "js/vistas/gasolina.js", "js/vistas/costos.js", "js/vistas/vencimientos.js", "js/vistas/supervisor.js", "js/vistas/trabajador.js",
+  "js/vistas/herramientas.js", "js/vistas/seguros.js", "js/vistas/vehiculos.js", "js/vistas/presupuestos.js", "js/vistas/gasolina.js", "js/vistas/costos.js", "js/vistas/cuadrillas.js", "js/vistas/vencimientos.js", "js/vistas/supervisor.js", "js/vistas/trabajador.js",
 ];
 
 self.addEventListener("install", (ev) => {

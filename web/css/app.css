@@ -496,3 +496,23 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .cos-tabla { min-width: 520px; }
 .enlace { background: none; border: 0; padding: 0; color: var(--acento); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
 @media (max-width: 720px) { .cos-dos { grid-template-columns: 1fr; } .cos-total { font-size: 28px; } .cos-nav b { min-width: 0; flex: 1; } }
+
+/* Cuadrillas */
+.cua-gestion, .cua-marcar { display: grid; gap: 14px; min-width: 0; }
+.cua-marcar > *, .cua-gestion > * { min-width: 0; max-width: 100%; }
+.cua-marcar select { width: 100%; max-width: 100%; }
+.cua-marcar .banner { overflow-wrap: anywhere; }
+.cua-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cua-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.cua-card { display: grid; gap: 10px; align-content: start; }
+.cua-card h3 { margin: 0; font-size: 16px; }
+.cua-personas { display: grid; gap: 8px; margin-top: 8px; }
+.cua-persona, .cua-fila { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--superficie); cursor: pointer; }
+.cua-persona input, .cua-fila input { width: 20px; height: 20px; accent-color: var(--acento); flex: none; }
+.cua-persona.off, .cua-fila.off { opacity: .55; }
+.cua-n { flex: 1; min-width: 0; }
+.cua-lista { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; max-height: 45vh; overflow: auto; }
+.cua-lista legend { padding: 0 0 6px; font-size: 13px; color: var(--gris); }
+.cua-hora { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cua-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 720px) { .cua-botones { grid-template-columns: 1fr; } }

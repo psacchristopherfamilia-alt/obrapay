@@ -8,7 +8,7 @@ import {
 import { P_TURNO } from "../datos.js";
 import { pildora } from "./trabajador.js";
 
-const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,semana_id,${P_TURNO},proyectos(nombre)`;
+const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,marcado_por,semana_id,${P_TURNO},proyectos(nombre)`;
 
 export function alertasTurno(tu) {
   const a = [];
@@ -32,6 +32,7 @@ export function tarjetaTurno(tu, emp, { yo, puedeAprobar = true, confirmaAdmin =
       <div class="pequeno">${fmtDia(fechaLocal(tu.entrada), { weekday: "short", day: "numeric", month: "short" })} · ${fmtHora(tu.entrada)} – ${tu.salida ? fmtHora(tu.salida) : t("turno.en_curso")} · ${tu.proyectos?.nombre || ""}</div>
       ${m && m.extra ? html`<div class="pequeno">${t("turno.incluye_extra", { extra: horas(m.extra) })}</div>` : ""}
       ${alertas.map((a) => html`<div class="nota alerta">${crudo(ICONO.alerta)} ${a}</div>`)}
+      ${tu.marcado_por && tu.marcado_por !== tu.perfil_id ? html`<div class="nota">${t("turno.marcado_sup")}</div>` : ""}
       ${tu.corregido ? html`<div class="nota">${t("horas.corregido")}</div>` : ""}
       <div class="turno-pie">
         ${pildora(tu.estado)}

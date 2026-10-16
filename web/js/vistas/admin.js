@@ -260,7 +260,7 @@ export async function vistaTurnos(el, ctx) {
   let semana = semanas.find((s) => s.estado === "abierta") || semanas[0];
   let filtro = "pendientes";
   let turnos = [];
-  const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,semana_id,${P_TURNO},proyectos(nombre)`;
+  const CAMPOS = `select=id,perfil_id,proyecto_id,entrada,salida,estado,fuera_de_area,cierre_automatico,corregido,marca_diferida,marcado_por,semana_id,${P_TURNO},proyectos(nombre)`;
 
   const cargar = async () => {
     if (filtro === "pendientes") {

@@ -14,6 +14,7 @@ import { vistaSeguros } from "./vistas/seguros.js";
 import { vistaVencimientos } from "./vistas/vencimientos.js";
 import { vistaVehiculos } from "./vistas/vehiculos.js";
 import { vistaPresupuestos } from "./vistas/presupuestos.js";
+import { vistaCuadrillas } from "./vistas/cuadrillas.js";
 import { vistaContador } from "./vistas/contador.js";
 import { vistaGastos, vistaCompanias } from "./vistas/companias.js";
 import { vistaHerramientas } from "./vistas/herramientas.js";
@@ -28,6 +29,7 @@ const RUTAS = [
   ["horas", "nav.horas", ["trabajador"], vistaMisHoras],
   ["pago", "nav.pago", ["trabajador"], vistaMiPago],
   ["aprobar", "nav.aprobar", ["supervisor"], vistaAprobar],
+  ["cuadrillas", "nav.cuadrillas", ["admin", "supervisor"], vistaCuadrillas],
   ["resumen", "nav.resumen", ["dueno"], vistaResumen],
   ["nomina", "nav.nomina", ["admin"], vistaNomina],
   ["turnos", "nav.turnos", ["admin"], vistaTurnos],

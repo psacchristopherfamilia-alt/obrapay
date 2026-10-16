@@ -156,6 +156,7 @@ function simulador(quien, llamadas) {
     }
     return r;
   };
+  const CU = { asignados: new Set([P.juan.id, P.pedro.id]), dentro: {}, lista: [{ id: id("q1"), nombre: "Cuadrilla Plomería", supervisor_id: P.ramon.id, supervisor: P.ramon.nombre, miembros: [{ id: P.juan.id, nombre: P.juan.nombre }, { id: P.marie.id, nombre: P.marie.nombre }] }] };
   const RPC = {
     semana_actual: () => id("s2"),
     mis_empresas: () => MIS_EMPRESAS,
@@ -227,6 +228,28 @@ function simulador(quien, llamadas) {
     reporte_altas_bajas: () => [
       { tipo: "alta", perfil_id: P.juan.id, apellido: "Pérez", nombre: "Juan", inicial: null, nombre_completo: "Juan Pérez", numero_nib: "NIB-1", fecha: "2026-10-01" }],
     reporte_mensual_proyectos: () => [{ proyecto_id: id("f1"), proyecto: "Villa Grace Bay", minutos_reg: 3000, minutos_extra: 300, bruto: 990 }],
+    cuadrillas_lista: () => CU.lista.filter((c) => quien.roles.includes("admin") || c.supervisor_id === quien.id),
+    trabajadores_cuadrilla: () => [P.juan, P.marie, P.pedro].map((w) => { const c = CU.lista.find((k) => k.miembros.some((m) => m.id === w.id)); return { perfil_id: w.id, nombre: w.nombre, cuadrilla_id: c?.id || null, cuadrilla: c?.nombre || null }; }),
+    guardar_cuadrilla: (b) => {
+      CU.lista.forEach((c) => { c.miembros = c.miembros.filter((m) => !b.p_miembros.includes(m.id) || c.id === b.p_id); });
+      const miembros = b.p_miembros.map((pid) => ({ id: pid, nombre: Object.values(P).find((w) => w.id === pid).nombre }));
+      const sup = b.p_supervisor ? P.ramon : (quien.roles.includes("supervisor") ? quien : null);
+      const fila = { id: b.p_id || id("q9"), nombre: b.p_nombre, supervisor_id: sup?.id || null, supervisor: sup?.nombre || null, miembros };
+      const i = CU.lista.findIndex((c) => c.id === fila.id);
+      if (i >= 0) CU.lista[i] = fila; else CU.lista.push(fila);
+      return fila.id;
+    },
+    quitar_cuadrilla: (b) => { CU.lista = CU.lista.filter((c) => c.id !== b.p_id); return null; },
+    asignar_cuadrilla_proyecto: (b) => { const c = CU.lista.find((k) => k.id === b.p_cuadrilla); let n = 0; for (const m of c.miembros) if (!CU.asignados.has(m.id)) { CU.asignados.add(m.id); n += 1; } return n; },
+    cuadrilla_estado: (b) => {
+      const gente = new Map();
+      CU.lista.filter((c) => quien.roles.includes("admin") || c.supervisor_id === quien.id).forEach((c) => c.miembros.forEach((m) => gente.set(m.id, c)));
+      CU.asignados.forEach((pid) => { if (!gente.has(pid)) gente.set(pid, null); });
+      return [...gente.entries()].map(([pid, c]) => ({ perfil_id: pid, nombre: Object.values(P).find((w) => w.id === pid).nombre, cuadrilla_id: c?.id || null, cuadrilla: c?.nombre || null,
+        asignado: CU.asignados.has(pid), turno_id: CU.dentro[pid] ? id("tt") : null, entrada: CU.dentro[pid] || null, turno_proyecto: CU.dentro[pid] ? b.p_proyecto : null }));
+    },
+    marcar_entrada_por: (b) => { b.p_perfiles.forEach((pid) => { CU.dentro[pid] = b.p_hora || "2026-10-16T11:00:00Z"; }); return { marcados: b.p_perfiles.length, omitidos: [] }; },
+    marcar_salida_por: (b) => { b.p_perfiles.forEach((pid) => { delete CU.dentro[pid]; }); return { marcados: b.p_perfiles.length, omitidos: [] }; },
   };
   const TABLAS = {
     perfiles: () => (quien.roles.includes("admin") || quien.roles.includes("dueno") ? Object.values(P) : [quien, ...(quien.roles.includes("supervisor") ? [P.juan, P.pedro] : [])]),
@@ -265,7 +288,7 @@ function simulador(quien, llamadas) {
     if (ruta === "/auth/v1/user" || ruta === "/auth/v1/logout") return json(200, {});
     if (ruta.startsWith("/rest/v1/rpc/")) {
       const fn = ruta.split("/").pop();
-      if (RPC[fn]) return json(200, RPC[fn](cuerpo || {}));
+      if (RPC[fn]) { try { return json(200, RPC[fn](cuerpo || {})); } catch (e) { console.log("MOCK", fn, e.message); throw e; } }
       if (fn === "aprobar_turnos") return json(200, cuerpo.p_ids.length);
       return json(200, null);
     }
@@ -289,8 +312,8 @@ const navegador = await chromium.launch({ executablePath: "/opt/pw-browsers/chro
 const fallas = [];
 const RECORRIDOS = [
   { quien: P.juan, ancho: 390, alto: 844, rutas: ["reloj", "horas", "pago"], idiomas: ["es", "en", "ht"] },
-  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas"], idiomas: ["es", "en", "ht"] },
-  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador", "ajustes"], idiomas: ["es", "en"] },
+  { quien: P.ramon, ancho: 390, alto: 844, rutas: ["aprobar", "gastos", "herramientas", "cuadrillas"], idiomas: ["es", "en", "ht"] },
+  { quien: P.admin, ancho: 1360, alto: 900, rutas: ["nomina", "turnos", "trabajadores", "proyectos", "prestamos", "gastos", "herramientas", "companias", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "cuadrillas", "contador", "ajustes"], idiomas: ["es", "en"] },
   { quien: P.admin, ancho: 390, alto: 844, rutas: ["nomina", "trabajadores", "herramientas", "presupuestos", "vehiculos", "vencimientos", "mivehiculo"], idiomas: ["es"], sufijo: "-movil" },
   { quien: P.dueno, ancho: 1360, alto: 900, rutas: ["resumen", "companias", "herramientas", "reportes", "seguros", "presupuestos", "vehiculos", "vencimientos", "contador"], idiomas: ["es", "en", "ht"] },
 ];
@@ -316,7 +339,7 @@ async function revisarPantalla(pagina, nombre, errores) {
   await pagina.waitForSelector(".esqueleto", { state: "detached", timeout: 8000 }).catch(() => {});
   await pagina.waitForTimeout(250);
   const texto = await pagina.evaluate(() => document.body.innerText);
-  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas|cos)\./.test(x)) || [];
+  const sinTraducir = texto.match(/\b(?:[a-z]+)\.(?:[a-z_]+)\b/g)?.filter((x) => /^(nav|comun|err|acceso|clave|reloj|horas|pago|turno|turnos|aprobar|nomina|ciclo|col|excel|trab|proy|prest|rep|aj|dueno|estado|semana|rol|aviso|gastos|comp|emp|herr|cont|seg|veh|venc|pres|gas|cos|cua)\./.test(x)) || [];
   const llaves = texto.match(/\{[a-z_]+\}/g) || [];
   const errorVista = await pagina.$(".error-vista");
   if (!(await pagina.$("#vista"))) fallas.push(`${nombre}: no cargó la vista (¿pantalla de entrar?)`);
@@ -338,6 +361,7 @@ async function revisarPantalla(pagina, nombre, errores) {
 }
 
 for (const r of RECORRIDOS) {
+  if (process.env.SOLO) break;
   for (const lang of r.idiomas) {
     const llamadas = [];
     const { ctx, pagina, errores } = await nuevaPagina(r.quien, r.ancho, r.alto, lang, llamadas);
@@ -353,6 +377,7 @@ for (const r of RECORRIDOS) {
 // Flujos
 // ---------------------------------------------------------------------------
 async function flujo(nombre, quien, ancho, pasos) {
+  if (process.env.SOLO && !nombre.includes(process.env.SOLO)) return;
   const llamadas = [];
   const { ctx, pagina, errores } = await nuevaPagina(quien, ancho, 844, "es", llamadas);
   try {
@@ -360,7 +385,8 @@ async function flujo(nombre, quien, ancho, pasos) {
     if (errores.length) fallas.push(`flujo ${nombre}: errores JS ${errores.join(" | ")}`);
     console.log(`ok - flujo ${nombre}`);
   } catch (e) {
-    fallas.push(`flujo ${nombre}: ${e.message.split("\n")[0]}`);
+    if (process.env.SOLO) console.log(JSON.stringify(llamadas.map((x) => x.ruta.split('/').pop() + x.qs.slice(0, 80))));
+    fallas.push(`flujo ${nombre}: ${e.message.split("\n")[0]}${errores.length ? " · JS: " + errores.join(" | ") : ""}`);
     await pagina.screenshot({ path: join(CAPTURAS, `FALLA-${nombre}.png`), fullPage: true });
   }
   await ctx.close();
@@ -783,6 +809,78 @@ await flujo("el supervisor no ve Presupuestos", P.ramon, 390, async (pg) => {
   await pg.goto(`${BASE}#/`);
   await pg.waitForTimeout(800);
   esperar((await pg.locator('a[href="#/presupuestos"]').count()) === 0, "el supervisor ve Presupuestos");
+});
+
+await flujo("admin crea una cuadrilla, la edita y la asigna a una obra", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/cuadrillas`);
+  await pg.waitForSelector("[data-cua-nueva]");
+  esperar((await pg.innerText("#vista")).includes("Cuadrilla Plomería"), "no lista la cuadrilla existente");
+  await pg.click("[data-cua-nueva]");
+  await pg.fill("#cu-nombre", "Cuadrilla Carpintería");
+  await pg.check(`.cua-lista input[value="${P.pedro.id}"]`);
+  await pg.check(`.cua-lista input[value="${P.juan.id}"]`);
+  await pg.waitForTimeout(100);
+  esperar((await pg.innerText("#cu-mover")).includes("Cuadrilla Plomería"), "no avisa que Juan se mueve de cuadrilla");
+  await pg.selectOption("#cu-sup", P.ramon.id);
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const g = ll.find((x) => x.ruta.endsWith("/guardar_cuadrilla"));
+  esperar(g && g.cuerpo.p_nombre === "Cuadrilla Carpintería" && g.cuerpo.p_miembros.length === 2 && g.cuerpo.p_supervisor === P.ramon.id, "datos mal enviados a guardar_cuadrilla");
+  esperar((await pg.innerText("#vista")).includes("Cuadrilla Carpintería"), "no aparece la cuadrilla nueva");
+  // nombre vacío
+  await pg.click("[data-cua-nueva]");
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(150);
+  esperar((await pg.locator("dialog .error-form").innerText()).length > 0 && ll.filter((x) => x.ruta.endsWith("/guardar_cuadrilla")).length === 1, "aceptó una cuadrilla sin nombre");
+  await pg.click("dialog [data-cerrar]");
+  // asignar a obra
+  await pg.click(`[data-cua-asignar="${id("q1")}"]`);
+  await pg.selectOption("#ca-obra", id("f1"));
+  await pg.click("dialog button[type=submit]");
+  await pg.waitForTimeout(300);
+  const a = ll.find((x) => x.ruta.endsWith("/asignar_cuadrilla_proyecto"));
+  esperar(a && a.cuerpo.p_cuadrilla === id("q1") && a.cuerpo.p_proyecto === id("f1"), "datos mal enviados a asignar_cuadrilla_proyecto");
+  await pg.screenshot({ path: `${CAPTURAS}/cuadrillas-admin.png`, fullPage: true });
+  // quitar
+  await pg.click(`[data-cua-quitar="${id("q1")}"]`);
+  await pg.click("[data-si]");
+  await pg.waitForTimeout(300);
+  esperar(ll.some((x) => x.ruta.endsWith("/quitar_cuadrilla")), "no quitó la cuadrilla");
+});
+
+await flujo("supervisor marca entrada sin los ausentes, con hora corregida, y luego salida", P.ramon, 390, async (pg, ll) => {
+  await pg.goto(`${BASE}#/cuadrillas`);
+  await pg.waitForSelector("#cm-obra");
+  const txt = await pg.innerText("#vista");
+  esperar(txt.includes("Cuadrilla Plomería") && txt.includes("Juan Pérez") && txt.includes("Marie Joseph"), "no muestra la cuadrilla del supervisor");
+  esperar(await pg.locator(`[data-cua-p="${P.marie.id}"]`).isDisabled(), "Marie no está asignada a la obra y no debería poder marcarse");
+  esperar((await pg.locator(`[data-cua-aqui="${id("q1")}"]`).count()) === 1, "falta el botón para asignar la cuadrilla a la obra");
+  await pg.click(`[data-cua-aqui="${id("q1")}"]`);
+  await pg.waitForTimeout(300);
+  esperar(!(await pg.locator(`[data-cua-p="${P.marie.id}"]`).isDisabled()), "Marie sigue bloqueada tras asignar la cuadrilla");
+  // desmarcar a Pedro (ausente) y corregir la hora
+  await pg.uncheck(`[data-cua-p="${P.pedro.id}"]`);
+  await pg.click("[data-cua-hora]");
+  await pg.fill("#cm-hora", "2026-10-16T07:30");
+  await pg.screenshot({ path: `${CAPTURAS}/cuadrillas-supervisor-movil.png`, fullPage: true });
+  await pg.click('[data-cua-marcar="entrada"]');
+  await pg.waitForTimeout(300);
+  const e = ll.find((x) => x.ruta.endsWith("/marcar_entrada_por"));
+  esperar(e && e.cuerpo.p_proyecto === id("f1") && e.cuerpo.p_perfiles.length === 2 && !e.cuerpo.p_perfiles.includes(P.pedro.id) && e.cuerpo.p_hora, "entrada mal enviada (ausente incluido o sin hora)");
+  esperar((await pg.innerText("#vista")).includes("En turno"), "no muestra a los que entraron");
+  await pg.click('[data-cua-marcar="salida"]');
+  await pg.waitForTimeout(300);
+  const s = ll.find((x) => x.ruta.endsWith("/marcar_salida_por"));
+  esperar(s && s.cuerpo.p_perfiles.length === 2 && s.cuerpo.p_hora === null, "salida mal enviada");
+});
+
+await flujo("el supervisor no ve el selector de supervisor al crear su cuadrilla", P.ramon, 390, async (pg) => {
+  await pg.goto(`${BASE}#/cuadrillas`);
+  await pg.waitForSelector("[data-cua-tab=gestionar]");
+  await pg.click("[data-cua-tab=gestionar]");
+  await pg.click("[data-cua-nueva]");
+  await pg.waitForSelector("#cu-nombre");
+  esperar((await pg.locator("#cu-sup").count()) === 0, "el supervisor puede elegir otro supervisor");
 });
 
 await flujo("admin crea trabajador", P.admin, 1360, async (pg, ll) => {
