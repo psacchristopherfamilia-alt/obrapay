@@ -178,6 +178,9 @@ function simulador(quien, llamadas) {
     plataforma_config: (b) => ({ empresa_id: b.p_empresa, nombre: "Compañía", extra_multiplicador: 1, extra_mult_desde: null, hora_extra_desde: "17:00", hora_cierre_turno: "23:00",
       almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", semana_inicio_dia: 4, pago_dias_despues: 2, marca_nombre: null, marca_color: null, marca_logo: null }),
     plataforma_guardar_config: () => null,
+    plataforma_tasas: () => [{ agencia: "NIB", vigente_desde: "2026-01-01", tasa_empleado: 5.5, tasa_empleador: 6.5, tope_mensual: 6000, dia_vencimiento: 15 },
+      { agencia: "NHIP", vigente_desde: "2026-01-01", tasa_empleado: 3, tasa_empleador: 3, tope_mensual: 7800, dia_vencimiento: 14 }],
+    plataforma_cambiar_tasa: () => null,
     plataforma_suspender: (b) => { if (b.p_suspender) PL.suspendidas.add(b.p_empresa); else PL.suspendidas.delete(b.p_empresa); return null; },
     plataforma_entrar: () => { PL.asistiendo = true; quien.roles = ["admin"]; return null; },
     plataforma_salir: () => { PL.asistiendo = false; quien.roles = ["trabajador"]; return null; },
@@ -1255,6 +1258,11 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   esperar(!ll.some((x) => x.ruta.endsWith("/plataforma_guardar_config")), "guardó sin fecha");
   await pg.fill("#cf-md", "2026-10-15");
   // marca: nombre, color y vista previa con iniciales
+  // descuentos de ley: solo se guarda lo que cambió
+  await pg.click('[data-cfg-tab="ley"]');
+  esperar((await pg.inputValue("#ley-NIB-te")) === "5.5" && (await pg.inputValue("#ley-NHIP-tope")) === "7800", "no muestra las tasas vigentes");
+  await pg.fill("#ley-NIB-te", "6");
+  await pg.fill("#ley-NIB-desde", "2027-01-01");
   await pg.click('[data-cfg-tab="marca"]');
   await pg.fill("#cf-mn", "Constructora Prueba");
   await pg.fill('dialog input[name=col]', "#1a73e8");
@@ -1267,6 +1275,8 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   esperar(g && g.cuerpo.p_empresa === id("e1"), "no guardó la configuración");
   esperar(g.cuerpo.p_cambios.extra_multiplicador === 1.5 && g.cuerpo.p_cambios.extra_mult_desde === "2026-10-15", "no mandó el multiplicador con su fecha");
   esperar(g.cuerpo.p_cambios.marca_nombre === "Constructora Prueba" && g.cuerpo.p_cambios.marca_color === "#1a73e8" && g.cuerpo.p_cambios.marca_logo === null, "no mandó la marca");
+  const tl = ll.filter((x) => x.ruta.endsWith("/plataforma_cambiar_tasa"));
+  esperar(tl.length === 1 && tl[0].cuerpo.p_agencia === "NIB" && tl[0].cuerpo.p_tasa_empleado === 6 && tl[0].cuerpo.p_tasa_empleador === 6.5 && tl[0].cuerpo.p_desde === "2027-01-01" && tl[0].cuerpo.p_empresa === id("e1"), "no mandó solo el cambio de NIB");
   esperar(g.cuerpo.p_cambios.semana_inicio_dia === 1 && g.cuerpo.p_cambios.pago_dias_despues === 4, "no mandó el calendario de pago");
   esperar(g.cuerpo.p_cambios.almuerzo_inicio === "12:00" && g.cuerpo.p_cambios.hora_extra_desde === "17:00", "cambió lo que no debía");
 });

@@ -599,3 +599,6 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .cfg-vista { border: 1px solid var(--borde); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; background: var(--superficie); }
 .cfg-vista .btn { pointer-events: none; }
 .plat-clave { padding: 12px 14px; background: var(--fondo-suave); border-radius: 10px; word-break: break-all; }
+
+.cfg-ley { border: 1px solid var(--borde); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; min-width: 0; }
+.cfg-ley legend { font: 700 13px var(--sans); padding: 0 6px; }

@@ -140,12 +140,14 @@ export async function vistaPlataforma(el, ctx) {
   const VARS_PREV = ["--acento", "--acento-osc", "--acento-suave", "--sobre-acento"];
   const ZONAS = ["America/Grand_Turk", "America/Nassau", "America/New_York", "America/Santo_Domingo", "America/Port-au-Prince", "America/Jamaica", "America/Puerto_Rico"];
   const modalConfig = async (f) => {
-    const c = await api.rpc("plataforma_config", { p_empresa: f.empresa_id });
+    const [c, tasas] = await Promise.all([api.rpc("plataforma_config", { p_empresa: f.empresa_id }), api.rpc("plataforma_tasas", { p_empresa: f.empresa_id })]);
+    const hoy = hoyLocal(c.zona_horaria);
+    const vigenteDe = (ag) => { const l = tasas.filter((x) => x.agencia === ag).sort((a, b) => (a.vigente_desde < b.vigente_desde ? -1 : 1)); return [...l].reverse().find((x) => x.vigente_desde <= hoy) || l[l.length - 1]; };
     const st = { color: c.marca_color || null, logo: c.marca_logo || null, nombre: c.marca_nombre || "", tab: "extra" };
     const dlg = abrirModal(t("cfg.titulo", { nombre: f.nombre }), html`
       <form class="form" novalidate>
         <div class="cfg-tabs" role="tablist">
-          ${["calendario", "extra", "turno", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "calendario"}">${t(`cfg.tab_${k}`)}</button>`)}
+          ${["calendario", "extra", "turno", "ley", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "calendario"}">${t(`cfg.tab_${k}`)}</button>`)}
         </div>
         <section class="cfg-panel" data-cfg-panel="calendario">
           <div class="cfg-fila">
@@ -174,6 +176,18 @@ export async function vistaPlataforma(el, ctx) {
           </div>
           <div class="campo"><label for="cf-z">${t("cfg.zona")}</label>
             <input id="cf-z" name="z" list="cf-zonas" value="${c.zona_horaria}" autocomplete="off"><datalist id="cf-zonas">${ZONAS.map((z) => html`<option value="${z}">`)}</datalist></div>
+        </section>
+        <section class="cfg-panel" data-cfg-panel="ley" hidden>
+          <p class="sub">${t("cfg.ley_nota")}</p>
+          ${["NIB", "NHIP"].map((ag) => { const v = vigenteDe(ag) || {}; return html`
+            <fieldset class="cfg-ley" data-ley="${ag}"><legend>${ag}</legend>
+              <div class="cfg-fila">
+                <div class="campo"><label for="ley-${ag}-te">${t("cfg.ley_te")}</label><input id="ley-${ag}-te" name="${ag}-te" type="number" inputmode="decimal" min="0" max="100" step="0.001" value="${Number(v.tasa_empleado ?? 0)}"></div>
+                <div class="campo"><label for="ley-${ag}-tp">${t("cfg.ley_tp")}</label><input id="ley-${ag}-tp" name="${ag}-tp" type="number" inputmode="decimal" min="0" max="100" step="0.001" value="${Number(v.tasa_empleador ?? 0)}"></div>
+                <div class="campo"><label for="ley-${ag}-tope">${t("cfg.ley_tope")}</label><input id="ley-${ag}-tope" name="${ag}-tope" type="number" inputmode="decimal" min="1" step="0.01" value="${Number(v.tope_mensual ?? 0)}"></div>
+                <div class="campo"><label for="ley-${ag}-dia">${t("cfg.ley_dia")}</label><input id="ley-${ag}-dia" name="${ag}-dia" type="number" inputmode="numeric" min="1" max="28" step="1" value="${Number(v.dia_vencimiento ?? 15)}"></div>
+                <div class="campo"><label for="ley-${ag}-desde">${t("cfg.ley_desde")}</label><input id="ley-${ag}-desde" name="${ag}-desde" type="date" value="${hoy}"></div>
+              </div></fieldset>`; })}
         </section>
         <section class="cfg-panel" data-cfg-panel="marca" hidden>
           <div class="campo"><label for="cf-mn">${t("cfg.marca_nombre")}</label><input id="cf-mn" name="mn" maxlength="60" value="${c.marca_nombre || ""}" placeholder="${f.nombre}" autocomplete="off"></div>
@@ -237,8 +251,21 @@ export async function vistaPlataforma(el, ctx) {
         hora_cierre_turno: form.hc.value, almuerzo_inicio: form.alm.checked ? form.ai.value : null, almuerzo_fin: form.alm.checked ? form.af.value : null,
         zona_horaria: form.z.value.trim(), semana_inicio_dia: Number(form.di.value), pago_dias_despues: Number(form.dp.value || 0), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
       };
+      // Descuentos de ley: solo se guarda la agencia cuyo dato cambió.
+      const leyes = [];
+      for (const ag of ["NIB", "NHIP"]) {
+        const v = vigenteDe(ag) || {};
+        const n = { te: Number(form[`${ag}-te`].value), tp: Number(form[`${ag}-tp`].value), tope: Number(form[`${ag}-tope`].value), dia: Number(form[`${ag}-dia`].value), desde: form[`${ag}-desde`].value };
+        const igual = n.te === Number(v.tasa_empleado) && n.tp === Number(v.tasa_empleador) && n.tope === Number(v.tope_mensual) && n.dia === Number(v.dia_vencimiento);
+        if (igual) continue;
+        if (!(n.te >= 0 && n.te <= 100 && n.tp >= 0 && n.tp <= 100 && n.tope > 0 && Number.isInteger(n.dia) && n.dia >= 1 && n.dia <= 28 && n.desde)) { err.hidden = false; err.textContent = t("cfg.f_ley", { ag }); return; }
+        leyes.push({ ag, ...n });
+      }
       try {
-        await ocupado(form.querySelector("[type=submit]"), () => api.rpc("plataforma_guardar_config", { p_empresa: f.empresa_id, p_cambios: cambios }));
+        await ocupado(form.querySelector("[type=submit]"), async () => {
+          await api.rpc("plataforma_guardar_config", { p_empresa: f.empresa_id, p_cambios: cambios });
+          for (const l of leyes) await api.rpc("plataforma_cambiar_tasa", { p_empresa: f.empresa_id, p_agencia: l.ag, p_desde: l.desde, p_tasa_empleado: l.te, p_tasa_empleador: l.tp, p_tope_mensual: l.tope, p_dia_vencimiento: l.dia });
+        });
         cerrarModal(); aviso(t("cfg.guardada"));
       } catch (e) { err.hidden = false; err.textContent = mensajeError(e); }
     });
