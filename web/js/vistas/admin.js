@@ -1,11 +1,12 @@
 // Vistas del administrador.
 import { api } from "../api.js";
-import { t } from "../i18n.js";
+import { t, fijarFrecuencia } from "../i18n.js";
 import {
   html, crudo, dinero, horas, horasDecimal, fmtSemana, fmtDia, hoyLocal, sumarDias, zona, nombreMes,
   aviso, mensajeError, ocupado, abrirModal, cerrarModal, confirmar, datosFormulario, ICONO,
 } from "../ui.js";
 import { crearXlsx, descargar } from "../xlsx.js";
+import { marcaDe } from "../marca.js";
 import {
   listaSemanas, semanaActual, semanaPorDefecto, rangoSemana, vigente, prestamosConSaldo, P_TURNO,
 } from "../datos.js";
@@ -129,7 +130,8 @@ export function exportarNomina(d, semana, empresa) {
       [t("excel.generado"), new Date().toISOString()],
     ],
   };
-  descargar(crearXlsx([hojaNomina, hojaProyectos, hojaInfo]), `nomina_${semana.inicio}_${semana.fin}.xlsx`);
+  const marca = marcaDe(empresa, `${t("comun.semana")} ${semana.inicio} – ${semana.fin} · ${t("excel.dia_pago")} ${semana.pago || sumarDias(semana.fin, 2)}`);
+  descargar(crearXlsx([hojaNomina, hojaProyectos, hojaInfo], marca), `nomina_${semana.inicio}_${semana.fin}.xlsx`);
 }
 
 function pasosCiclo(semana) {
@@ -832,7 +834,7 @@ export async function vistaReportes(el, ctx) {
       { nombre: t("excel.por_proyecto"), columnas: [{ titulo: t("col.proyecto"), ancho: 28 }, { titulo: t("col.horas"), tipo: "horas" },
         { titulo: t("col.extra"), tipo: "horas" }, { titulo: t("col.bruto"), tipo: "dinero" }],
         filas: proyectos.map((p) => [p.proyecto, horasDecimal(p.minutos_reg + p.minutos_extra), horasDecimal(p.minutos_extra), r2(p.bruto)]) },
-    ]), `reporte_${etiqueta}.xlsx`);
+    ], marcaDe(ctx.empresa, `${t("rep.titulo")} ${etiqueta}`)), `reporte_${etiqueta}.xlsx`);
   });
   await cargar();
 }
@@ -865,7 +867,28 @@ export async function vistaAjustes(el, ctx) {
       <p class="nota">${t("aj.zona", { zona: zona() })} · ${t("aj.semana_fija")}</p>
       <p class="error-form" role="alert" hidden></p>
       <div><button type="submit" class="btn btn-pri">${t("comun.guardar")}</button></div>
+    </form>
+    <form class="tarjeta form ajustes" id="form-pagos" novalidate>
+      <h2 class="etiqueta">${t("aj.pagos")}</h2>
+      <div class="campo"><label for="a-frec">${t("cfg.frecuencia")}</label>
+        <select id="a-frec" name="frec">${["semanal", "quincenal", "mensual"].map((k) => html`<option value="${k}" ${k === (e.pago_frecuencia || "semanal") ? html`selected` : ""}>${t(`frec.${k}`)} — ${t(`frec.d_${k}`)}</option>`)}</select></div>
+      <p class="nota">${t("aj.pagos_dias", { dias: Number(e.pago_dias_despues ?? 2) })}</p>
+      <p class="nota">${t("frec.nota")}</p>
+      <p class="error-form" role="alert" hidden></p>
+      <div><button type="submit" class="btn btn-pri">${t("aj.pagos_guardar")}</button></div>
     </form>`);
+  const fp = el.querySelector("#form-pagos");
+  fp.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const err = fp.querySelector(".error-form");
+    try {
+      await ocupado(fp.querySelector("[type=submit]"), () => api.rpc("cambiar_frecuencia_pago", { p_frecuencia: fp.frec.value }));
+      ctx.empresa.pago_frecuencia = fp.frec.value;
+      fijarFrecuencia(fp.frec.value);
+      err.hidden = true;
+      aviso(t("aj.pagos_guardado"));
+    } catch (e2) { err.hidden = false; err.textContent = mensajeError(e2); }
+  });
   const f = el.querySelector("#form-ajustes");
   f.addEventListener("submit", async (ev) => {
     ev.preventDefault();

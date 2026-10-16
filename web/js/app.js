@@ -1,7 +1,7 @@
 // Arranque, sesión, menú por rol y enrutador.
 import { api, ApiError } from "./api.js";
 import { vigilar } from "./cola.js";
-import { t, fijarIdioma, idioma, IDIOMAS } from "./i18n.js";
+import { t, fijarIdioma, fijarFrecuencia, idioma, IDIOMAS } from "./i18n.js";
 import { html, esc, crudo, aviso, mensajeError, fijarZona, ICONO, ocupado, cerrarModal } from "./ui.js";
 import { vistaEntrar, vistaCambiarClave } from "./vistas/acceso.js";
 import { vistaReloj, vistaMisHoras, vistaMiPago } from "./vistas/trabajador.js";
@@ -80,6 +80,7 @@ function cargarCtxGuardado(yo) {
     ctx.roles = c.perfil.roles || [];
     fijarIdioma(c.perfil.idioma);
     fijarZona(c.empresa?.zona_horaria);
+    fijarFrecuencia(c.empresa?.pago_frecuencia);
     aplicarYGuardar(c.empresa);
     return true;
   } catch { return false; }
@@ -130,6 +131,7 @@ async function cargarContextoRed(yo) {
   }
   fijarIdioma(perfil.idioma);
   fijarZona(ctx.empresa.zona_horaria);
+  fijarFrecuencia(ctx.empresa.pago_frecuencia);
   aplicarYGuardar(ctx.empresa);
 }
 

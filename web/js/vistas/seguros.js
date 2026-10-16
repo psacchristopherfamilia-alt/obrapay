@@ -7,6 +7,7 @@ import {
   html, crudo, dinero, fmtDia, hoyLocal, nombreMes, aviso, mensajeError, ocupado, abrirModal, cerrarModal, ICONO,
 } from "../ui.js";
 import { crearXlsx, descargar } from "../xlsx.js";
+import { marcaDe } from "../marca.js";
 
 const AGENCIAS = ["NIB", "NHIP"];
 const r2 = (n) => Math.round(Number(n) * 100) / 100;
@@ -218,7 +219,7 @@ export async function vistaSeguros(el, ctx) {
           { titulo: t("seg.base_nhip"), tipo: "dinero" }, { titulo: `NHIP ${t("seg.empleado")}`, tipo: "dinero" }, { titulo: `NHIP ${t("seg.empleador")}`, tipo: "dinero" }],
           filas: remesa.map((x) => [x.nombre, x.numero_nib || "", x.numero_nhip || "", r2(x.base_nib), r2(x.nib_empleado), r2(x.nib_empleador),
             r2(x.base_nhip), r2(x.nhip_empleado), r2(x.nhip_empleador)]) },
-      ]), `remesa_${anio}-${String(mes).padStart(2, "0")}.xlsx`);
+      ], marcaDe(ctx.empresa, `${t("seg.remesa")} ${anio}-${String(mes).padStart(2, "0")}`)), `remesa_${anio}-${String(mes).padStart(2, "0")}.xlsx`);
     }
   });
   await cargar();

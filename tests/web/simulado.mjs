@@ -169,6 +169,7 @@ function simulador(quien, llamadas) {
   const RPC = {
     mi_aceptacion: () => ESTADO.terminos,
     aceptar_terminos: (b) => { ESTADO.terminos = b.p_version; return null; },
+    cambiar_frecuencia_pago: () => null,
     plataforma_yo: () => [{ es_plataforma: ES_PLAT, asistiendo: PL.asistiendo, empresa: PL.asistiendo ? "Mi empresa" : null }],
     mi_cuenta: () => (ESTADO.suspendida ? [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: true, vence: sumar(-10) }] : [{ empresa_id: EMP.id, nombre: EMP.nombre, suspendida: false, vence: sumar(10) }]),
     plataforma_panel: () => PL.filas.map((f) => ({ demo: false, ...f, suspendida: PL.suspendidas.has(f.empresa_id) })),
@@ -201,7 +202,7 @@ function simulador(quien, llamadas) {
     plataforma_pagos: () => PL.pagos,
     plataforma_pago: (b) => { const f = PL.filas.find((x) => x.empresa_id === b.p_empresa); f.vence = sumar(30); PL.suspendidas.delete(b.p_empresa); PL.pagos.unshift({ creado_en: new Date().toISOString(), monto: b.p_monto, vence_despues: f.vence }); return f.vence; },
     plataforma_config: (b) => ({ empresa_id: b.p_empresa, nombre: "Compañía", extra_multiplicador: 1, extra_mult_desde: null, hora_extra_desde: "17:00", hora_cierre_turno: "23:00",
-      almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", semana_inicio_dia: 4, pago_dias_despues: 2, marca_nombre: null, marca_color: null, marca_logo: null }),
+      almuerzo_inicio: "12:00", almuerzo_fin: "13:00", zona_horaria: "America/Grand_Turk", semana_inicio_dia: 4, pago_dias_despues: 2, pago_frecuencia: "semanal", marca_nombre: null, marca_color: null, marca_logo: null }),
     plataforma_guardar_config: () => null,
     plataforma_tasas: () => [{ agencia: "NIB", vigente_desde: "2026-01-01", tasa_empleado: 5.5, tasa_empleador: 6.5, tope_mensual: 6000, dia_vencimiento: 15 },
       { agencia: "NHIP", vigente_desde: "2026-01-01", tasa_empleado: 3, tasa_empleador: 3, tope_mensual: 7800, dia_vencimiento: 14 }],
@@ -971,6 +972,37 @@ await flujo("admin cambia tarifa y exporta Excel", P.admin, 1360, async (pg, ll)
   const bytes = await readFile(archivo);
   esperar(bytes.slice(0, 2).toString() === "PK", "el Excel no es un ZIP");
   esperar(descarga.suggestedFilename() === "nomina_2026-10-01_2026-10-07.xlsx", `nombre inesperado ${descarga.suggestedFilename()}`);
+  esperar(bytes.toString("latin1").includes("Mi empresa"), "el Excel de nómina no lleva el nombre de la compañía");
+});
+
+const PNG_1X1 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+await flujo("el Excel de nómina lleva el logo y el nombre de la marca", P.admin, 1360, async (pg) => {
+  ESTADO.marca = { marca_nombre: "Constructora Prueba", marca_color: null, marca_logo: PNG_1X1 };
+  try {
+    await pg.goto(BASE);
+    await pg.reload();
+    await pg.goto(`${BASE}#/nomina`);
+    await pg.waitForSelector("#excel:not([disabled])");
+    const [d] = await Promise.all([pg.waitForEvent("download"), pg.click("#excel")]);
+    const archivo = join(CAPTURAS, `marca_${d.suggestedFilename()}`);
+    await d.saveAs(archivo);
+    const txt = (await readFile(archivo)).toString("latin1");
+    esperar(txt.includes("Constructora Prueba"), "el Excel no lleva el nombre de marca");
+    esperar(txt.includes("xl/media/logo.png") && txt.includes("xl/drawings/drawing1.xml"), "el Excel no lleva el logo");
+  } finally { ESTADO.marca = null; }
+});
+
+await flujo("admin elige pago quincenal y la app habla de periodos", P.admin, 1360, async (pg, ll) => {
+  await pg.goto(`${BASE}#/ajustes`);
+  await pg.waitForSelector("#a-frec");
+  await pg.selectOption("#a-frec", "quincenal");
+  await pg.click("#form-pagos [type=submit]");
+  await pg.waitForTimeout(300);
+  const r = ll.find((x) => x.ruta.endsWith("/cambiar_frecuencia_pago"));
+  esperar(r && r.cuerpo.p_frecuencia === "quincenal", "no cambió la frecuencia de pago");
+  await pg.goto(`${BASE}#/nomina`);
+  await pg.waitForSelector("h1");
+  esperar((await pg.innerText("h1")).toLowerCase().includes("periodo"), "la nómina no habla de periodo");
 });
 
 await flujo("admin restablece contraseña", P.admin, 1360, async (pg, ll) => {
@@ -1272,6 +1304,13 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   await pg.waitForSelector("#cf-di");
   // calendario: jueves a miércoles, pago el viernes; se cambia a lunes y 4 días después
   esperar((await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("jueves a miércoles") && (await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("viernes"), "no resume el calendario actual");
+  // frecuencia: quincenal esconde el día de inicio y resume las quincenas; se vuelve a semanal para seguir
+  esperar((await pg.locator("#cf-fr").count()) === 1, "no hay selector de frecuencia de pago");
+  await pg.selectOption("#cf-fr", "quincenal");
+  esperar((await pg.locator("[data-cfg-di]").isHidden()) && (await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("quincenas"), `quincenal no esconde el día de inicio ni resume las quincenas (${await pg.locator("[data-cfg-di]").isHidden()} | ${await pg.innerText("[data-cfg-cal]")})`);
+  await pg.selectOption("#cf-fr", "mensual");
+  esperar((await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("mes:"), "mensual no resume el mes");
+  await pg.selectOption("#cf-fr", "semanal");
   await pg.selectOption("#cf-di", "1");
   await pg.fill("#cf-dp", "4");
   esperar((await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("lunes a domingo") && (await pg.innerText("[data-cfg-cal]")).toLowerCase().includes("jueves"), "no actualiza el resumen del calendario");
@@ -1303,7 +1342,7 @@ await flujo("plataforma: configurar horas extra y marca de una compañía", P.pl
   esperar(g.cuerpo.p_cambios.marca_nombre === "Constructora Prueba" && g.cuerpo.p_cambios.marca_color === "#1a73e8" && g.cuerpo.p_cambios.marca_logo === null, "no mandó la marca");
   const tl = ll.filter((x) => x.ruta.endsWith("/plataforma_cambiar_tasa"));
   esperar(tl.length === 1 && tl[0].cuerpo.p_agencia === "NIB" && tl[0].cuerpo.p_tasa_empleado === 6 && tl[0].cuerpo.p_tasa_empleador === 6.5 && tl[0].cuerpo.p_desde === "2027-01-01" && tl[0].cuerpo.p_empresa === id("e1"), "no mandó solo el cambio de NIB");
-  esperar(g.cuerpo.p_cambios.semana_inicio_dia === 1 && g.cuerpo.p_cambios.pago_dias_despues === 4, "no mandó el calendario de pago");
+  esperar(g.cuerpo.p_cambios.semana_inicio_dia === 1 && g.cuerpo.p_cambios.pago_dias_despues === 4 && g.cuerpo.p_cambios.pago_frecuencia === "semanal", "no mandó el calendario de pago");
   esperar(g.cuerpo.p_cambios.almuerzo_inicio === "12:00" && g.cuerpo.p_cambios.hora_extra_desde === "17:00", "cambió lo que no debía");
 });
 

@@ -590,7 +590,7 @@ dialog.modal[open] { animation: entra .18s ease-out; }
 .cfg-tabs button { flex: 1 1 auto; min-height: 36px; border: 0; background: transparent; border-radius: 8px; font: 600 13px var(--sans); color: var(--tinta); cursor: pointer; padding: 6px 10px; }
 .cfg-tabs button[aria-selected="true"] { background: var(--superficie); box-shadow: var(--sombra); }
 .cfg-panel { display: flex; flex-direction: column; gap: 14px; }
-.cfg-panel[hidden] { display: none; }
+.cfg-panel[hidden], .campo[hidden] { display: none; }
 .cfg-fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .cfg-marca { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .cfg-marca .logo-marca { width: 64px; height: 64px; font-size: 22px; }

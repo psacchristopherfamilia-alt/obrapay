@@ -82,3 +82,6 @@ export function reducirLogo(archivo, max = 160) {
     img.src = url;
   });
 }
+
+// Marca para el encabezado de los Excel (logo + nombre). Sin logo sale solo el nombre.
+export const marcaDe = (e, linea = "") => ({ nombre: nombreMarca(e), logo: e?.marca_logo || null, linea });

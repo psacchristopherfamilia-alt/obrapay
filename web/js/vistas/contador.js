@@ -6,6 +6,7 @@ import {
   html, fmtDia, hoyLocal, nombreMes, aviso, mensajeError, ocupado, abrirModal, cerrarModal, datosFormulario,
 } from "../ui.js";
 import { crearXlsx, descargar } from "../xlsx.js";
+import { marcaDe } from "../marca.js";
 import { hojasNibMes, hojasNibSemana, hojasNhip, hojasProyectos, nombreArchivo } from "../contador.js";
 
 const ultimoDia = (anio, mes) => new Date(Date.UTC(anio, mes, 0)).getUTCDate();
@@ -138,7 +139,12 @@ export async function vistaContador(el, ctx) {
       const sinNib = new Set(filas.filter((f) => !(cual === "nhip" ? f.numero_nhip : f.numero_nib)).map((f) => f.perfil_id)).size;
       if (sinNib) aviso(t("cont.sin_numero", { n: sinNib }), "ok");
     }
-    descargar(crearXlsx(hojas), nombreArchivo(prefijo, nombreEmpresa(), etiqueta));
+    // Logo y nombre de la compañía elegida (puede no ser la activa).
+    let cia = ctx.empresa;
+    if (estado.empresa !== ctx.empresa.id) {
+      try { cia = (await api.sel("empresas", `select=id,nombre,marca_nombre,marca_logo&id=eq.${estado.empresa}`))[0] || { nombre: nombreEmpresa() }; } catch { cia = { nombre: nombreEmpresa() }; }
+    }
+    descargar(crearXlsx(hojas, marcaDe(cia, `${t(esMes ? "cont.un_mes" : "cont.una_semana")} ${etiqueta}`)), nombreArchivo(prefijo, nombreEmpresa(), etiqueta));
   };
 
   el.addEventListener("change", (ev) => {

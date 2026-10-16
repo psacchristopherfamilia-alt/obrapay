@@ -1,5 +1,6 @@
 // Textos en español, inglés y kreyòl ayisyen.
 // El kreyòl debe revisarlo una persona nativa antes del lanzamiento.
+import { textoPeriodo } from "./periodo-textos.js";
 export const IDIOMAS = [["es", "Español"], ["en", "English"], ["ht", "Kreyòl"]];
 
 const es = {
@@ -716,6 +717,20 @@ const es = {
   "cfg.pago_despues": "Se paga (días después del cierre)",
   "cfg.cal_resumen": "Semana de {ini} a {fin} · se paga el {pago}",
   "cfg.cal_nota": "El día de pago se aplica a las semanas que aún no se cierran. El día de inicio solo se puede cambiar antes de que la compañía registre horas.",
+  "cfg.frecuencia": "Frecuencia de pago",
+  "frec.semanal": "Cada semana",
+  "frec.quincenal": "Cada quincena",
+  "frec.mensual": "Cada mes",
+  "frec.d_semanal": "Eliges el día de inicio (por defecto, de jueves a miércoles).",
+  "frec.d_quincenal": "Del 1 al 15 y del 16 al último día del mes.",
+  "frec.d_mensual": "Mes calendario, del 1 al último día.",
+  "frec.nota": "El cambio vale solo para los periodos que se abran después: el periodo abierto termina como estaba y los cerrados o pagados no cambian. Queda anotado en el Historial.",
+  "cfg.cal_resumen_q": "Quincenas: del 1 al 15 y del 16 al fin de mes · se paga {dias} días después del cierre",
+  "cfg.cal_resumen_m": "Mes: del 1 al último día · se paga {dias} días después del cierre",
+  "aj.pagos": "Pagos",
+  "aj.pagos_guardar": "Guardar frecuencia",
+  "aj.pagos_guardado": "Frecuencia de pago guardada",
+  "aj.pagos_dias": "Se paga {dias} días después de cerrar el periodo.",
   "cfg.f_pago": "Los días hasta el pago deben estar entre 0 y 13",
   "usr.boton": "Agregar usuario",
   "usr.titulo": "Agregar usuario · {nombre}",
@@ -1967,6 +1982,20 @@ const en = {
   "resp.c_contenido": "Contents",
   "resp.contenido": "{c} companies · {f} records",
   "resp.alerta": "The last automatic backup is more than 2 days old. Check that the Supabase scheduler is active.",
+  "cfg.frecuencia": "Pay frequency",
+  "frec.semanal": "Every week",
+  "frec.quincenal": "Twice a month",
+  "frec.mensual": "Every month",
+  "frec.d_semanal": "You choose the start day (by default, Thursday to Wednesday).",
+  "frec.d_quincenal": "From the 1st to the 15th and from the 16th to the last day of the month.",
+  "frec.d_mensual": "Calendar month, from the 1st to the last day.",
+  "frec.nota": "The change only applies to periods opened afterwards: the open period ends as it was, and closed or paid ones do not change. It is recorded in the History.",
+  "cfg.cal_resumen_q": "Half-months: 1st to 15th and 16th to month end · paid {dias} days after closing",
+  "cfg.cal_resumen_m": "Month: 1st to last day · paid {dias} days after closing",
+  "aj.pagos": "Payments",
+  "aj.pagos_guardar": "Save frequency",
+  "aj.pagos_guardado": "Pay frequency saved",
+  "aj.pagos_dias": "Paid {dias} days after the period closes.",
   "resp.descargado": "Backup downloaded",
   "cfg.tab_ley": "Statutory deductions",
   "cfg.ley_nota": "NIB and NHIP rates for this company. A change applies from the date you choose and never touches weeks already closed.",
@@ -3218,6 +3247,20 @@ const ht = {
   "plat.demo_reiniciar_txt": "Tout sa yo te fè nan demo a efase epi li ranpli ankò ak nouvo done envante. Konpayi reyèl yo pa touche.",
   "plat.demo_reiniciada": "Demo a rekòmanse",
   "resp.titulo": "Kopi sekou",
+  "cfg.frecuencia": "Frekans peman",
+  "frec.semanal": "Chak semèn",
+  "frec.quincenal": "De fwa pa mwa",
+  "frec.mensual": "Chak mwa",
+  "frec.d_semanal": "Ou chwazi jou kòmansman an (pa defo, jedi rive mèkredi).",
+  "frec.d_quincenal": "Soti 1 rive 15 ak soti 16 rive dènye jou mwa a.",
+  "frec.d_mensual": "Mwa kalandriye, soti 1 rive dènye jou a.",
+  "frec.nota": "Chanjman an valab sèlman pou peryòd yo ouvri apre: peryòd ki ouvè a fini jan li te ye a, e sa ki fèmen oswa peye yo pa chanje. Yo anrejistre l nan Istwa a.",
+  "cfg.cal_resumen_q": "De fwa pa mwa: 1 rive 15 ak 16 rive fen mwa · yo peye {dias} jou apre fèmti",
+  "cfg.cal_resumen_m": "Mwa: 1 rive dènye jou · yo peye {dias} jou apre fèmti",
+  "aj.pagos": "Peman",
+  "aj.pagos_guardar": "Sove frekans lan",
+  "aj.pagos_guardado": "Frekans peman sove",
+  "aj.pagos_dias": "Yo peye {dias} jou apre peryòd la fèmen.",
   "resp.sub": "Chak maten bonè yo sove yon kopi tout konpayi yo (yo kenbe 14 dènye yo). Telechaje youn chak semèn epi kenbe l yon lòt kote, nan Drive ou.",
   "resp.aviso": "Kopi a rete nan menm pwojè Supabase la. Pou w pwoteje vre, telechaje youn chak semèn. Anvan w vann, pi bon bagay la se pase sou Supabase Pro.",
   "resp.ahora": "Kreye yon kopi kounye a",
@@ -3820,9 +3863,13 @@ export function fijarIdioma(c) {
   document.documentElement.lang = c;
   try { localStorage.setItem("obrapay.idioma", c); } catch { /* nada */ }
 }
+// Compañías que pagan por quincena o por mes: donde dice "semana", dice "periodo" (ver periodo-textos.js).
+let porPeriodo = false;
+export const fijarFrecuencia = (f) => { porPeriodo = f === "quincenal" || f === "mensual"; };
 export function t(clave, vars = {}) {
   // Singular: si n = 1 y existe "clave_1", se usa esa.
   const k = vars.n === 1 && (TEXTOS[actual][`${clave}_1`] || TEXTOS.es[`${clave}_1`]) ? `${clave}_1` : clave;
-  const s = TEXTOS[actual][k] ?? TEXTOS.es[k] ?? clave;
+  let s = TEXTOS[actual][k] ?? TEXTOS.es[k] ?? clave;
+  if (porPeriodo) s = textoPeriodo(actual, k, s) ?? s;
   return s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
 }

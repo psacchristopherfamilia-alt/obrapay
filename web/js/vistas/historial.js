@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { t } from "../i18n.js";
 import { html, dinero, fmtDia, fmtFechaHora, aviso, mensajeError, ocupado, hoyLocal, aLocal } from "../ui.js";
 import { crearXlsx, descargar } from "../xlsx.js";
+import { marcaDe } from "../marca.js";
 import { hojasExportacion, nombreExport } from "../exportar.js";
 
 // Grupos para filtrar: cada uno es la lista de tipos de evento que la base guarda.
@@ -89,7 +90,7 @@ export function montarHistorial(raiz, opciones = {}) {
     const filas = st.items.map((ev) => { const x = describir(ev); return [aLocal(ev.creado_en).replace("T", " "), ...(st.todas ? [ev.empresa] : []), ev.por || t("hist.sistema"), x.titulo, x.detalle]; });
     const columnas = [{ titulo: t("hist.c_fecha"), ancho: 18 }, ...(st.todas ? [{ titulo: t("hist.c_compania"), ancho: 24 }] : []),
       { titulo: t("hist.c_quien"), ancho: 22 }, { titulo: t("hist.c_que"), ancho: 60 }, { titulo: t("hist.c_detalle"), ancho: 50 }];
-    descargar(crearXlsx([{ nombre: t("hist.titulo"), columnas, filas }]), `obrapay-historial_${hoyLocal()}.xlsx`);
+    descargar(crearXlsx([{ nombre: t("hist.titulo"), columnas, filas }], opciones.empresa ? marcaDe(opciones.empresa, hoyLocal()) : null), `obrapay-historial_${hoyLocal()}.xlsx`);
   };
 
   raiz.addEventListener("click", (ev) => {
@@ -119,10 +120,10 @@ export async function vistaHistorial(el, ctx) {
     try {
       await ocupado(ev.currentTarget, async () => {
         const v = await api.rpc("exportar_todo", {});
-        descargar(crearXlsx(hojasExportacion(v)), nombreExport(ctx.empresa?.nombre, hoyLocal()));
+        descargar(crearXlsx(hojasExportacion(v), marcaDe(ctx.empresa, `${t("hist.exportar")} · ${hoyLocal()}`)), nombreExport(ctx.empresa?.nombre, hoyLocal()));
       });
       aviso(t("hist.exportado"));
     } catch (e) { aviso(mensajeError(e), "error"); }
   });
-  await montarHistorial(el.querySelector("[data-hist]"));
+  await montarHistorial(el.querySelector("[data-hist]"), { empresa: ctx.empresa });
 }

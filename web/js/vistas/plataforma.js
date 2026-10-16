@@ -185,14 +185,17 @@ export async function vistaPlataforma(el, ctx) {
           ${["calendario", "extra", "turno", "ley", "marca"].map((k) => html`<button type="button" role="tab" data-cfg-tab="${k}" aria-selected="${k === "calendario"}">${t(`cfg.tab_${k}`)}</button>`)}
         </div>
         <section class="cfg-panel" data-cfg-panel="calendario">
+          <div class="campo"><label for="cf-fr">${t("cfg.frecuencia")}</label>
+            <select id="cf-fr" name="fr">${["semanal", "quincenal", "mensual"].map((k) => html`<option value="${k}" ${k === (c.pago_frecuencia || "semanal") ? html`selected` : ""}>${t(`frec.${k}`)} — ${t(`frec.d_${k}`)}</option>`)}</select></div>
           <div class="cfg-fila">
-            <div class="campo"><label for="cf-di">${t("cfg.sem_inicio")}</label>
+            <div class="campo" data-cfg-di><label for="cf-di">${t("cfg.sem_inicio")}</label>
               <select id="cf-di" name="di">${[1, 2, 3, 4, 5, 6, 7].map((n) => html`<option value="${n}" ${n === Number(c.semana_inicio_dia) ? html`selected` : ""}>${nombreDia(n)}</option>`)}</select></div>
             <div class="campo"><label for="cf-dp">${t("cfg.pago_despues")}</label>
               <input id="cf-dp" name="dp" type="number" inputmode="numeric" min="0" max="13" step="1" value="${Number(c.pago_dias_despues)}"></div>
           </div>
           <div class="cfg-vista" data-cfg-cal></div>
           <p class="sub">${t("cfg.cal_nota")}</p>
+          <p class="sub">${t("frec.nota")}</p>
         </section>
         <section class="cfg-panel" data-cfg-panel="extra" hidden>
           <div class="campo"><label for="cf-hx">${t("cfg.extra_desde")}</label><input id="cf-hx" name="hx" type="time" value="${c.hora_extra_desde}" required></div>
@@ -255,9 +258,13 @@ export async function vistaPlataforma(el, ctx) {
     const verCal = () => {
       const di = Number(form.di.value); const dp = Math.max(0, Math.min(13, Number(form.dp.value || 0)));
       const fin = ((di + 5) % 7) + 1; const pago = ((fin - 1 + dp) % 7) + 1;
-      form.querySelector("[data-cfg-cal]").textContent = t("cfg.cal_resumen", { ini: nombreDia(di), fin: nombreDia(fin), pago: nombreDia(pago) });
+      const fr = form.fr.value;
+      form.querySelector("[data-cfg-di]").hidden = fr !== "semanal";
+      form.querySelector("[data-cfg-cal]").textContent = fr === "quincenal" ? t("cfg.cal_resumen_q", { dias: dp })
+        : fr === "mensual" ? t("cfg.cal_resumen_m", { dias: dp })
+        : t("cfg.cal_resumen", { ini: nombreDia(di), fin: nombreDia(fin), pago: nombreDia(pago) });
     };
-    form.di.addEventListener("change", verCal); form.dp.addEventListener("input", verCal); verCal();
+    form.fr.addEventListener("change", verCal); form.di.addEventListener("change", verCal); form.dp.addEventListener("input", verCal); verCal();
     const verAlm = () => { form.querySelector("[data-cfg-alm]").hidden = !form.alm.checked; };
     pintarMarca(); verAlm();
     dlg.addEventListener("click", (ev) => {
@@ -284,7 +291,7 @@ export async function vistaPlataforma(el, ctx) {
       const cambios = {
         hora_extra_desde: form.hx.value, extra_multiplicador: mult, extra_mult_desde: mult > 1 ? form.md.value : null,
         hora_cierre_turno: form.hc.value, almuerzo_inicio: form.alm.checked ? form.ai.value : null, almuerzo_fin: form.alm.checked ? form.af.value : null,
-        zona_horaria: form.z.value.trim(), semana_inicio_dia: Number(form.di.value), pago_dias_despues: Number(form.dp.value || 0), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
+        zona_horaria: form.z.value.trim(), semana_inicio_dia: Number(form.di.value), pago_frecuencia: form.fr.value, pago_dias_despues: Number(form.dp.value || 0), marca_nombre: form.mn.value.trim() || null, marca_color: st.color, marca_logo: st.logo,
       };
       // Descuentos de ley: solo se guarda la agencia cuyo dato cambió.
       const leyes = [];
