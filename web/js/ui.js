@@ -153,7 +153,7 @@ export function mensajeError(e) {
   if (/Invalid login credentials/i.test(m)) return t("err.credenciales");
   if (/permission denied|No tienes permiso/i.test(m)) return t("err.permiso");
   if (/Password should be|password.*characters|weak/i.test(m)) return t("err.clave_debil");
-  if (/JWT|no_sesion/i.test(m)) return t("err.sesion");
+  if (/JWT|no_sesion|Refresh Token|session_not_found|refresh_token_not_found/i.test(m)) return t("err.sesion");
   return m.length > 180 ? t("err.general") : m;
 }
 
